@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Jellyfin brand colors -->
+    <color name="jellyfin_purple">#AA5CC3</color>
+    <color name="jellyfin_purple_dark">#7B2FBE</color>
+    <color name="jellyfin_blue">#0087E2</color>
+
+    <!-- General -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- Backgrounds -->
+    <color name="login_background">#1C1C1E</color>
+    <color name="browse_background">#141414</color>
+    <color name="card_background">#292929</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#AAAAAA</color>
+</resources>

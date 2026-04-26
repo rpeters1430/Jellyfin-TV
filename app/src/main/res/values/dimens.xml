@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Login screen dimensions -->
+    <dimen name="login_horizontal_padding">120dp</dimen>
+    <dimen name="login_vertical_padding">48dp</dimen>
+    <dimen name="login_title_size">36sp</dimen>
+    <dimen name="login_title_margin_bottom">32dp</dimen>
+    <dimen name="login_field_width">480dp</dimen>
+    <dimen name="login_button_margin_top">16dp</dimen>
+    <dimen name="login_progress_margin">12dp</dimen>
+
+    <!-- Card dimensions -->
+    <dimen name="card_width">313dp</dimen>
+    <dimen name="card_height">176dp</dimen>
+</resources>

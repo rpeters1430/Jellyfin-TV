@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme for Android TV -->
+    <style name="Theme.JellyfinTV" parent="Theme.Leanback">
+        <item name="colorPrimary">@color/jellyfin_purple</item>
+        <item name="colorPrimaryDark">@color/jellyfin_purple_dark</item>
+        <item name="colorAccent">@color/jellyfin_blue</item>
+        <item name="android:windowBackground">@color/browse_background</item>
+    </style>
+
+    <!-- Login screen uses a standard (non-Leanback) dark theme -->
+    <style name="Theme.JellyfinTV.Login" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/jellyfin_purple</item>
+        <item name="colorPrimaryDark">@color/jellyfin_purple_dark</item>
+        <item name="colorAccent">@color/jellyfin_blue</item>
+        <item name="android:windowBackground">@color/login_background</item>
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="android:editTextColor">@color/white</item>
+    </style>
+
+    <!-- Playback: full-screen, no status bar -->
+    <style name="Theme.JellyfinTV.Playback" parent="Theme.JellyfinTV">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
+</resources>

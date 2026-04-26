@@ -51,7 +51,7 @@ class BrowseViewModel(private val repository: JellyfinRepository) : ViewModel() 
             // Filter in-progress items on the client side
             val allItems = continueWatchingDeferred.await().getOrElse { null }
             val continueWatching = allItems?.items
-                ?.filter { it.userData?.playbackPositionTicks?.let { t -> t > 0 } == true }
+                ?.filter { (it.userData?.playbackPositionTicks ?: 0) > 0 }
                 ?: emptyList()
 
             _state.value = BrowseState.Ready(

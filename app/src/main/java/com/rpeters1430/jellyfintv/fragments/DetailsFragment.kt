@@ -129,8 +129,13 @@ class DetailsFragment : DetailsSupportFragment() {
                             val path = src.directStreamUrl
                             if (!path.isNullOrBlank()) {
                                 val base = serverUrl.trimEnd('/')
-                                if (path.startsWith("http")) path
-                                else "$base$path?api_key=$token"
+                                if (path.startsWith("http")) {
+                                    path
+                                } else {
+                                    // Append api_key as a query parameter, respecting existing '?'
+                                    val separator = if (path.contains('?')) '&' else '?'
+                                    "$base$path${separator}api_key=$token"
+                                }
                             } else null
                         }
                         ?: ImageUrlBuilder.videoStreamUrl(serverUrl, item.id, userId, token)

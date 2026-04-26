@@ -1,6 +1,5 @@
 package com.rpeters1430.jellyfintv.fragments
 
-import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.view.View
@@ -113,7 +112,7 @@ class BrowseFragment : BrowseSupportFragment() {
     private fun setupEventListeners() {
         onItemViewClickedListener = OnItemViewClickedListener { _, item, _, _ ->
             if (item is BaseItemDto) {
-                startActivity(DetailsActivity.createIntent(requireActivity() as androidx.fragment.app.FragmentActivity, item))
+                startActivity(DetailsActivity.createIntent(requireActivity(), item))
             }
         }
 

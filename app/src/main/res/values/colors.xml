@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Jellyfin brand colours -->
+    <!-- Jellyfin brand colors -->
     <color name="jellyfin_purple">#AA5CC3</color>
     <color name="jellyfin_purple_dark">#7B2FBE</color>
     <color name="jellyfin_blue">#0087E2</color>

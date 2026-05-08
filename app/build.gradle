@@ -39,7 +39,7 @@ android {
 
 dependencies {
     // Kotlin
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.23'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.25'
 
     // Material Components (for TextInputLayout on login screen)
     implementation 'com.google.android.material:material:1.12.0'

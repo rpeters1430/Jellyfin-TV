@@ -54,7 +54,7 @@ dependencies {
     // Lifecycle (ViewModel + LiveData)
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.2'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.8.2'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.2'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
 
     // Networking
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'

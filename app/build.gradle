@@ -66,7 +66,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.14.0'
 
     // Image loading
-    implementation 'com.github.bumptech.glide:glide:4.16.0'
+    implementation 'com.github.bumptech.glide:glide:5.0.7'
     kapt 'com.github.bumptech.glide:compiler:4.16.0'
 
     // Video playback (ExoPlayer via Media3)

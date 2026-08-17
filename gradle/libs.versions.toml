@@ -18,7 +18,7 @@ okhttp = "5.5.0"
 coil = "2.7.0"
 media3 = "1.11.0"
 mockk = "1.14.11"
-mockwebserver = "5.4.0"
+mockwebserver = "5.5.0"
 turbine = "1.2.1"
 
 [libraries]

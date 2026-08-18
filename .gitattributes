@@ -1,0 +1,5 @@
+# Force LF line endings on gradlew regardless of platform/autocrlf settings - CRLF would
+# break the shebang line when the release workflow runs it on a Linux runner. This doesn't
+# cover the executable bit itself (that's the index's file mode, which .gitattributes can't
+# set) - see .github/workflows/release.yml's defensive `chmod +x` step for that half.
+gradlew text eol=lf

@@ -36,6 +36,13 @@ jobs:
       - name: Decode release keystore
         run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore.jks"
 
+      # Belt-and-suspenders: gradlew's executable bit has already been lost once from a
+      # Windows commit (git on Windows doesn't track the x bit by default), which fails this
+      # step with "Permission denied" even though it's fine in git's index. Don't depend on
+      # the index staying right going forward.
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
       - name: Run unit tests and build signed release APK
         env:
           APP_VERSION_NAME: ${{ steps.version.outputs.version_name }}

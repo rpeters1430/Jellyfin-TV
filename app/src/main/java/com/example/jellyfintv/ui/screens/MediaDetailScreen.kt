@@ -1,10 +1,14 @@
 package com.example.jellyfintv.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -23,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.*
@@ -366,24 +372,33 @@ fun MediaDetailScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             state.seasons.forEach { season ->
                                 val isSelected = season.id == state.selectedSeasonId
+                                val chipInteractionSource = remember { MutableInteractionSource() }
                                 var isFocused by remember { mutableStateOf(false) }
+                                val isHovered by chipInteractionSource.collectIsHoveredAsState()
+                                val isHighlighted = isFocused || isHovered
+
                                 Box(
                                     modifier = Modifier
+                                        .hoverable(interactionSource = chipInteractionSource)
+                                        .onFocusChanged { isFocused = it.isFocused }
+                                        .clickable(
+                                            interactionSource = chipInteractionSource,
+                                            indication = null
+                                        ) {
+                                            viewModel.selectSeason(season.id)
+                                        }
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(
-                                            if (isFocused) FocusRingColor
+                                            if (isHighlighted) FocusRingColor
                                             else if (isSelected) JellyfinBlue
                                             else CardSurface
                                         )
-                                        .clickable { viewModel.selectSeason(season.id) }
-                                        .onFocusChanged { isFocused = it.isFocused }
-                                        .focusable()
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(
                                         text = season.name,
                                         style = MaterialTheme.typography.labelMedium.copy(
-                                            color = if (isSelected || isFocused) Color.White else TextSecondary,
+                                            color = if (isSelected || isHighlighted) Color.White else TextSecondary,
                                             fontWeight = FontWeight.Bold
                                         )
                                     )
@@ -432,23 +447,34 @@ private fun EpisodeCard(
     thumbnailHeaders: Map<String, String>,
     onPlay: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isHighlighted = isFocused || isHovered
+    val scale by animateFloatAsState(targetValue = if (isHighlighted) 1.05f else 1.0f, label = "episodeScale")
     val isWatched = episode.userData?.played == true
     val progress = episode.userData?.playedPercentage ?: 0f
 
     Column(
         modifier = Modifier
             .width(260.dp)
+            .zIndex(if (isHighlighted) 10f else 0f)
+            .scale(scale)
+            .hoverable(interactionSource = interactionSource)
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onPlay()
+            }
             .clip(RoundedCornerShape(12.dp))
             .background(CardSurface)
             .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) FocusRingColor else CardSurfaceVariant,
+                width = if (isHighlighted) 3.dp else 1.dp,
+                color = if (isHighlighted) FocusRingColor else CardSurfaceVariant,
                 shape = RoundedCornerShape(12.dp)
             )
-            .clickable { onPlay() }
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
     ) {
         // Thumbnail Box (16:9)
         Box(

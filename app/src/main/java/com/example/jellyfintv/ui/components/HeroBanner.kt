@@ -6,7 +6,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -208,14 +210,23 @@ fun HeroBanner(
 
                 // Action Buttons
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val playInteractionSource = remember { MutableInteractionSource() }
                     var playFocused by remember { mutableStateOf(false) }
+                    val playHovered by playInteractionSource.collectIsHoveredAsState()
+                    val playHighlighted = playFocused || playHovered
+
                     Box(
                         modifier = Modifier
+                            .hoverable(interactionSource = playInteractionSource)
                             .onFocusChanged { playFocused = it.isFocused }
-                            .focusable()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (playFocused) FocusRingColor else JellyfinBlue)
-                            .clickable { onPlayClick(item) }
+                            .background(if (playHighlighted) FocusRingColor else JellyfinBlue)
+                            .clickable(
+                                interactionSource = playInteractionSource,
+                                indication = null
+                            ) {
+                                onPlayClick(item)
+                            }
                             .padding(horizontal = 20.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -237,19 +248,28 @@ fun HeroBanner(
                         }
                     }
 
+                    val detailsInteractionSource = remember { MutableInteractionSource() }
                     var detailsFocused by remember { mutableStateOf(false) }
+                    val detailsHovered by detailsInteractionSource.collectIsHoveredAsState()
+                    val detailsHighlighted = detailsFocused || detailsHovered
+
                     Box(
                         modifier = Modifier
+                            .hoverable(interactionSource = detailsInteractionSource)
                             .onFocusChanged { detailsFocused = it.isFocused }
-                            .focusable()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(CardSurface)
+                            .background(if (detailsHighlighted) CardSurfaceVariant else CardSurface)
                             .border(
-                                width = if (detailsFocused) 2.dp else 1.dp,
-                                color = if (detailsFocused) FocusRingColor else TextSecondary,
+                                width = if (detailsHighlighted) 2.dp else 1.dp,
+                                color = if (detailsHighlighted) FocusRingColor else TextSecondary,
                                 shape = RoundedCornerShape(12.dp)
                             )
-                            .clickable { onDetailsClick(item) }
+                            .clickable(
+                                interactionSource = detailsInteractionSource,
+                                indication = null
+                            ) {
+                                onDetailsClick(item)
+                            }
                             .padding(horizontal = 20.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -257,13 +277,15 @@ fun HeroBanner(
                             Icon(
                                 imageVector = Icons.Default.Info,
                                 contentDescription = "Details",
-                                tint = TextPrimary,
+                                tint = if (detailsHighlighted) Color.White else TextPrimary,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Details",
-                                style = MaterialTheme.typography.labelLarge.copy(color = TextPrimary)
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    color = if (detailsHighlighted) Color.White else TextPrimary
+                                )
                             )
                         }
                     }

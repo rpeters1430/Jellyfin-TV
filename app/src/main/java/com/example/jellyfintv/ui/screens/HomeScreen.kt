@@ -1,9 +1,12 @@
 package com.example.jellyfintv.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,11 +20,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.*
@@ -38,6 +43,7 @@ fun HomeScreen(
     onPlayMedia: (MediaItem) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToLibrary: (MediaItem) -> Unit,
+    onOpenThemeSelector: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: HomeViewModel = viewModel(
         key = "home_${repository.prefs.serverUrl}_${repository.prefs.userId}_${repository.prefs.token}"
@@ -147,6 +153,7 @@ fun HomeScreen(
                     onNavigateHome = {},
                     onNavigateSearch = onNavigateToSearch,
                     onNavigateLibrary = { lib -> onNavigateToLibrary(lib) },
+                    onOpenThemeSelector = onOpenThemeSelector,
                     onLogout = onLogout
                 )
             }
@@ -184,22 +191,33 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             items(state.userLibraries, key = { it.id }) { lib ->
+                                val interactionSource = remember { MutableInteractionSource() }
                                 var isFocused by remember { mutableStateOf(false) }
+                                val isHovered by interactionSource.collectIsHoveredAsState()
+                                val isHighlighted = isFocused || isHovered
+                                val scale by animateFloatAsState(targetValue = if (isHighlighted) 1.06f else 1.0f, label = "libScale")
                                 val icon = com.example.jellyfintv.ui.components.getLibraryIcon(lib.collectionType, lib.name)
                                 Box(
                                     modifier = Modifier
                                         .width(160.dp)
                                         .height(76.dp)
+                                        .zIndex(if (isHighlighted) 10f else 0f)
+                                        .scale(scale)
+                                        .hoverable(interactionSource = interactionSource)
+                                        .onFocusChanged { isFocused = it.isFocused }
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            indication = null
+                                        ) {
+                                            onNavigateToLibrary(lib)
+                                        }
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isFocused) JellyfinPurple.copy(alpha = 0.8f) else CardSurface)
+                                        .background(if (isHighlighted) JellyfinPurple.copy(alpha = 0.8f) else CardSurface)
                                         .border(
-                                            width = if (isFocused) 2.dp else 1.dp,
-                                            color = if (isFocused) FocusRingColor else CardSurfaceVariant,
+                                            width = if (isHighlighted) 2.5.dp else 1.dp,
+                                            color = if (isHighlighted) FocusRingColor else CardSurfaceVariant,
                                             shape = RoundedCornerShape(12.dp)
                                         )
-                                        .clickable { onNavigateToLibrary(lib) }
-                                        .onFocusChanged { isFocused = it.isFocused }
-                                        .focusable()
                                         .padding(12.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
@@ -207,7 +225,7 @@ fun HomeScreen(
                                         Icon(
                                             imageVector = icon,
                                             contentDescription = lib.name,
-                                            tint = if (isFocused) Color.White else JellyfinBlue,
+                                            tint = if (isHighlighted) Color.White else JellyfinBlue,
                                             modifier = Modifier.size(26.dp)
                                         )
                                         Spacer(modifier = Modifier.width(10.dp))
@@ -215,7 +233,7 @@ fun HomeScreen(
                                             text = lib.name,
                                             style = MaterialTheme.typography.titleSmall.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                color = TextPrimary
+                                                color = if (isHighlighted) Color.White else TextPrimary
                                             ),
                                             maxLines = 2,
                                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis

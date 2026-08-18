@@ -3,6 +3,9 @@ package com.example.jellyfintv.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,6 +49,7 @@ fun AppNavHeader(
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateLibrary: (MediaItem) -> Unit,
+    onOpenThemeSelector: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     Row(
@@ -129,26 +133,60 @@ fun AppNavHeader(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Right: User profile / Disconnect
-        var logoutFocused by remember { mutableStateOf(false) }
-        Button(
-            onClick = onLogout,
-            modifier = Modifier.onFocusChanged { logoutFocused = it.isFocused },
-            colors = ButtonDefaults.colors(
-                containerColor = if (logoutFocused) FocusRingColor else CardSurface,
-                contentColor = TextPrimary
-            )
+        // Right Actions: Theme Selector & User profile / Disconnect
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                contentDescription = "Logout",
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (username.isNotBlank()) username else "Disconnect",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
-            )
+            // Theme Selector Button
+            val themeSource = remember { MutableInteractionSource() }
+            var themeFocused by remember { mutableStateOf(false) }
+            val themeHovered by themeSource.collectIsHoveredAsState()
+            val themeHighlighted = themeFocused || themeHovered
+
+            IconButton(
+                onClick = onOpenThemeSelector,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (themeHighlighted) FocusRingColor else CardSurface)
+                    .hoverable(themeSource)
+                    .onFocusChanged { themeFocused = it.isFocused }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Palette,
+                    contentDescription = "Theme & Colors",
+                    tint = if (themeHighlighted) Color.White else TextPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            // Logout Button
+            val logoutSource = remember { MutableInteractionSource() }
+            var logoutFocused by remember { mutableStateOf(false) }
+            val logoutHovered by logoutSource.collectIsHoveredAsState()
+            val logoutHighlighted = logoutFocused || logoutHovered
+
+            Button(
+                onClick = onLogout,
+                modifier = Modifier
+                    .hoverable(logoutSource)
+                    .onFocusChanged { logoutFocused = it.isFocused },
+                colors = ButtonDefaults.colors(
+                    containerColor = if (logoutHighlighted) FocusRingColor else CardSurface,
+                    contentColor = TextPrimary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                    contentDescription = "Logout",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (username.isNotBlank()) username else "Disconnect",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                )
+            }
         }
     }
 }
@@ -160,33 +198,36 @@ private fun NavTabButton(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isHighlighted = isFocused || isHovered
 
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (isFocused) FocusRingColor
+                if (isHighlighted) FocusRingColor
                 else if (isSelected) CardSurfaceVariant
                 else Color.Transparent
             )
-            .clickable { onClick() }
+            .hoverable(interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable()
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = title,
-            tint = if (isSelected || isFocused) Color.White else TextSecondary,
+            tint = if (isSelected || isHighlighted) Color.White else TextSecondary,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.labelMedium.copy(
-                color = if (isSelected || isFocused) Color.White else TextSecondary,
+                color = if (isSelected || isHighlighted) Color.White else TextSecondary,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 fontSize = 12.sp
             )

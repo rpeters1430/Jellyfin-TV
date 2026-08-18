@@ -4,7 +4,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.tv.material3.*
 import com.example.jellyfintv.data.model.MediaItem
 import com.example.jellyfintv.ui.theme.*
@@ -35,27 +38,46 @@ fun MediaCard(
     modifier: Modifier = Modifier,
     posterHeaders: Map<String, String> = emptyMap()
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     var isFocused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(targetValue = if (isFocused) 1.08f else 1.0f, label = "cardScale")
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isHighlighted = isFocused || isHovered
+
+    LaunchedEffect(isHovered) {
+        if (isHovered) {
+            onFocus()
+        }
+    }
+
+    val scale by animateFloatAsState(
+        targetValue = if (isHighlighted) 1.08f else 1.0f,
+        label = "cardScale"
+    )
 
     Box(
         modifier = modifier
             .width(160.dp)
             .height(260.dp)
+            .zIndex(if (isHighlighted) 10f else 0f)
             .scale(scale)
+            .hoverable(interactionSource = interactionSource)
             .onFocusChanged { focusState ->
                 isFocused = focusState.isFocused
                 if (focusState.isFocused) {
                     onFocus()
                 }
             }
-            .focusable()
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
+            }
             .clip(RoundedCornerShape(12.dp))
             .background(CardSurface)
             .border(
-                width = if (isFocused) 3.dp else 0.dp,
-                color = if (isFocused) FocusRingColor else Color.Transparent,
+                width = if (isHighlighted) 3.5.dp else 0.dp,
+                color = if (isHighlighted) FocusRingColor else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
     ) {
@@ -65,9 +87,17 @@ fun MediaCard(
             headers = posterHeaders,
             contentDescription = item.name,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         )
+
+        // Highlight sheen overlay when hovered or focused
+        if (isHighlighted) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = 0.08f))
+            )
+        }
 
         // Gradient shadow at bottom
         Box(
@@ -115,7 +145,7 @@ fun MediaCard(
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = TextPrimary
+                    color = if (isHighlighted) Color.White else TextPrimary
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

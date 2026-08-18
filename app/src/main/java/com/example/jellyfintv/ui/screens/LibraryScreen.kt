@@ -41,6 +41,7 @@ fun LibraryScreen(
     onNavigateHome: () -> Unit,
     onNavigateSearch: () -> Unit,
     onNavigateLibrary: (MediaItem) -> Unit,
+    onOpenThemeSelector: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: LibraryViewModel = viewModel(
         key = "lib_${parentId}_${collectionType}_${mediaType}"
@@ -63,6 +64,7 @@ fun LibraryScreen(
                 onNavigateHome = onNavigateHome,
                 onNavigateSearch = onNavigateSearch,
                 onNavigateLibrary = onNavigateLibrary,
+                onOpenThemeSelector = onOpenThemeSelector,
                 onLogout = onLogout
             )
 

@@ -6,6 +6,7 @@ class FakeServerPreferences : ServerPreferences {
     override var token: String = ""
     override var userId: String = ""
     override var username: String = ""
+    override var appTheme: String = "JELLYFIN"
     override var trustSelfSignedCerts: Boolean = false
 
     override val isLoggedIn: Boolean
@@ -16,6 +17,7 @@ class FakeServerPreferences : ServerPreferences {
         token = ""
         userId = ""
         username = ""
+        appTheme = "JELLYFIN"
         trustSelfSignedCerts = false
     }
 }

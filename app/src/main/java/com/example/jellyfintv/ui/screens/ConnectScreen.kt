@@ -5,11 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.runtime.*
@@ -35,7 +39,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ConnectScreen(
     repository: JellyfinRepository,
-    onConnected: () -> Unit
+    onConnected: () -> Unit,
+    onOpenThemeSelector: (() -> Unit)? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -105,6 +110,33 @@ fun ConnectScreen(
                     )
                 )
         )
+
+        // Top right theme selector button
+        if (onOpenThemeSelector != null) {
+            val themeSource = remember { MutableInteractionSource() }
+            var themeFocused by remember { mutableStateOf(false) }
+            val themeHovered by themeSource.collectIsHoveredAsState()
+            val themeHighlighted = themeFocused || themeHovered
+
+            IconButton(
+                onClick = onOpenThemeSelector,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(32.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (themeHighlighted) FocusRingColor else CardSurface.copy(alpha = 0.85f))
+                    .border(1.dp, CardSurfaceVariant, RoundedCornerShape(10.dp))
+                    .hoverable(themeSource)
+                    .onFocusChanged { themeFocused = it.isFocused }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Palette,
+                    contentDescription = "Theme & Colors",
+                    tint = if (themeHighlighted) Color.White else TextPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
 
         Row(
             modifier = Modifier

@@ -13,6 +13,7 @@ interface ServerPreferences {
     var token: String
     var userId: String
     var username: String
+    var appTheme: String
 
     // Opt-in only: bypasses TLS certificate validation entirely for this server.
     // Must never default to true - see RetrofitClient.getTrustAllCertsClient().
@@ -45,6 +46,10 @@ class AndroidServerPreferences(context: Context) : ServerPreferences {
         get() = prefs.getString(KEY_USERNAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_USERNAME, value).apply()
 
+    override var appTheme: String
+        get() = prefs.getString(KEY_APP_THEME, "JELLYFIN") ?: "JELLYFIN"
+        set(value) = prefs.edit().putString(KEY_APP_THEME, value).apply()
+
     override var trustSelfSignedCerts: Boolean
         get() = prefs.getBoolean(KEY_TRUST_SELF_SIGNED, false)
         set(value) = prefs.edit().putBoolean(KEY_TRUST_SELF_SIGNED, value).apply()
@@ -62,6 +67,7 @@ class AndroidServerPreferences(context: Context) : ServerPreferences {
         private const val KEY_TOKEN = "auth_token"
         private const val KEY_USER_ID = "user_id"
         private const val KEY_USERNAME = "username"
+        private const val KEY_APP_THEME = "app_theme"
         private const val KEY_TRUST_SELF_SIGNED = "trust_self_signed_certs"
     }
 }

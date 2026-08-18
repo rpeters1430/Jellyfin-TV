@@ -15,8 +15,10 @@ import androidx.tv.material3.Surface
 import com.example.jellyfintv.data.model.MediaItem
 import com.example.jellyfintv.data.preferences.AndroidServerPreferences
 import com.example.jellyfintv.data.repository.JellyfinRepository
+import com.example.jellyfintv.ui.components.ThemeSelectorDialog
 import com.example.jellyfintv.ui.components.UpdateDialog
 import com.example.jellyfintv.ui.screens.*
+import com.example.jellyfintv.ui.theme.AppThemePreset
 import com.example.jellyfintv.ui.theme.JellyfinTVTheme
 
 sealed class Screen {
@@ -42,12 +44,21 @@ class MainActivity : ComponentActivity() {
         val repository = JellyfinRepository(prefs)
 
         setContent {
-            JellyfinTVTheme {
+            var currentTheme by remember {
+                mutableStateOf(AppThemePreset.fromId(prefs.appTheme))
+            }
+            var showThemeDialog by remember { mutableStateOf(false) }
+
+            JellyfinTVTheme(preset = currentTheme) {
                 var currentScreen by remember {
                     mutableStateOf<Screen>(if (prefs.isLoggedIn) Screen.Home else Screen.Connect)
                 }
 
-                BackHandler(enabled = currentScreen !is Screen.Connect) {
+                BackHandler(enabled = currentScreen !is Screen.Connect || showThemeDialog) {
+                    if (showThemeDialog) {
+                        showThemeDialog = false
+                        return@BackHandler
+                    }
                     when (currentScreen) {
                         is Screen.Detail -> currentScreen = Screen.Home
                         is Screen.Search -> currentScreen = Screen.Home
@@ -85,7 +96,8 @@ class MainActivity : ComponentActivity() {
                         is Screen.Connect -> {
                             ConnectScreen(
                                 repository = repository,
-                                onConnected = { currentScreen = Screen.Home }
+                                onConnected = { currentScreen = Screen.Home },
+                                onOpenThemeSelector = { showThemeDialog = true }
                             )
                         }
                         is Screen.Home -> {
@@ -101,6 +113,7 @@ class MainActivity : ComponentActivity() {
                                         title = lib.name
                                     )
                                 },
+                                onOpenThemeSelector = { showThemeDialog = true },
                                 onLogout = handleLogout
                             )
                         }
@@ -124,6 +137,7 @@ class MainActivity : ComponentActivity() {
                                         title = lib.name
                                     )
                                 },
+                                onOpenThemeSelector = { showThemeDialog = true },
                                 onLogout = handleLogout
                             )
                         }
@@ -146,6 +160,7 @@ class MainActivity : ComponentActivity() {
                                         title = lib.name
                                     )
                                 },
+                                onOpenThemeSelector = { showThemeDialog = true },
                                 onLogout = handleLogout
                             )
                         }
@@ -171,6 +186,17 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+                    }
+
+                    if (showThemeDialog) {
+                        ThemeSelectorDialog(
+                            currentTheme = currentTheme,
+                            onSelectTheme = { selectedTheme ->
+                                currentTheme = selectedTheme
+                                prefs.appTheme = selectedTheme.id
+                            },
+                            onDismiss = { showThemeDialog = false }
+                        )
                     }
 
                     UpdateDialog(

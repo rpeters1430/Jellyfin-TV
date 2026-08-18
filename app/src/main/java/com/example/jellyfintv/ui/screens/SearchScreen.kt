@@ -40,6 +40,7 @@ fun SearchScreen(
     onBack: () -> Unit,
     onNavigateHome: () -> Unit,
     onNavigateLibrary: (MediaItem) -> Unit,
+    onOpenThemeSelector: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: SearchViewModel = viewModel { SearchViewModel(repository) }
 ) {
@@ -64,6 +65,7 @@ fun SearchScreen(
                 onNavigateHome = onNavigateHome,
                 onNavigateSearch = {},
                 onNavigateLibrary = onNavigateLibrary,
+                onOpenThemeSelector = onOpenThemeSelector,
                 onLogout = onLogout
             )
 

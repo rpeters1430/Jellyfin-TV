@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ fun getLibraryIcon(collectionType: String?, name: String): ImageVector {
     return when {
         type == "movies" || lowerName.contains("movie") || lowerName.contains("film") -> Icons.Default.Movie
         type == "tvshows" || lowerName.contains("tv") || lowerName.contains("series") || lowerName.contains("show") || lowerName.contains("anime") -> Icons.Default.Tv
+        type == "playlists" || type == "playlist" || lowerName.contains("playlist") || lowerName.contains("youtube") -> Icons.AutoMirrored.Filled.PlaylistPlay
         type == "music" || lowerName.contains("music") || lowerName.contains("song") || lowerName.contains("audio") -> Icons.Default.MusicNote
         type == "homevideos" || type == "photos" || lowerName.contains("video") || lowerName.contains("photo") || lowerName.contains("stuff") -> Icons.Default.PhotoLibrary
         type == "boxsets" || lowerName.contains("collection") -> Icons.Default.VideoLibrary

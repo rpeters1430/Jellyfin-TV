@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
 enum class SearchFilter(val label: String) {
     ALL("All"),
     MOVIES("Movies"),
-    SERIES("TV Shows")
+    SERIES("TV Shows"),
+    PLAYLISTS("Playlists")
 }
 
 class SearchViewModel(
@@ -36,6 +37,9 @@ class SearchViewModel(
                 SearchFilter.MOVIES -> searchResults.filter { it.type.equals("Movie", ignoreCase = true) }
                 SearchFilter.SERIES -> searchResults.filter {
                     it.type.equals("Series", ignoreCase = true) || it.type.equals("Episode", ignoreCase = true)
+                }
+                SearchFilter.PLAYLISTS -> searchResults.filter {
+                    it.type.equals("Playlist", ignoreCase = true) || it.collectionType?.equals("playlists", ignoreCase = true) == true
                 }
             }
     }

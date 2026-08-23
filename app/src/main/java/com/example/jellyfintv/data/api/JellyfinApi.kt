@@ -80,12 +80,20 @@ interface JellyfinApi {
         @Query("fields") fields: String = "Overview,RunTimeTicks,UserData,PrimaryImageAspectRatio"
     ): Response<ItemsResponse>
 
+    @GET("Playlists/{playlistId}/Items")
+    suspend fun getPlaylistItems(
+        @Header("Authorization") authHeader: String,
+        @Path("playlistId") playlistId: String,
+        @Query("userId") userId: String,
+        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,MediaSources,UserData,PrimaryImageAspectRatio"
+    ): Response<ItemsResponse>
+
     @GET("Users/{userId}/Items")
     suspend fun searchItems(
         @Header("Authorization") authHeader: String,
         @Path("userId") userId: String,
         @Query("searchTerm") searchTerm: String,
-        @Query("includeItemTypes") includeItemTypes: String? = "Movie,Series,Episode",
+        @Query("includeItemTypes") includeItemTypes: String? = "Movie,Series,Episode,Video,MusicAlbum,Audio,Playlist",
         @Query("recursive") recursive: Boolean = true,
         @Query("limit") limit: Int = 40,
         @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,PrimaryImageAspectRatio"
@@ -103,6 +111,29 @@ interface JellyfinApi {
         @Header("Authorization") authHeader: String,
         @Path("itemId") itemId: String,
         @Query("userId") userId: String
+    ): Response<UserData>
+
+    @GET("Items/{itemId}/Similar")
+    suspend fun getSimilarItems(
+        @Header("Authorization") authHeader: String,
+        @Path("itemId") itemId: String,
+        @Query("userId") userId: String,
+        @Query("limit") limit: Int = 12,
+        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,PrimaryImageAspectRatio"
+    ): Response<ItemsResponse>
+
+    @POST("Users/{userId}/PlayedItems/{itemId}")
+    suspend fun markPlayed(
+        @Header("Authorization") authHeader: String,
+        @Path("userId") userId: String,
+        @Path("itemId") itemId: String
+    ): Response<UserData>
+
+    @DELETE("Users/{userId}/PlayedItems/{itemId}")
+    suspend fun unmarkPlayed(
+        @Header("Authorization") authHeader: String,
+        @Path("userId") userId: String,
+        @Path("itemId") itemId: String
     ): Response<UserData>
 
     @POST("Sessions/Playing")

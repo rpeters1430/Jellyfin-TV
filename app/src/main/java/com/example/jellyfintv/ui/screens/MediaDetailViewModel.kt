@@ -19,12 +19,21 @@ class MediaDetailViewModel(
     data class UiState(
         val isLoading: Boolean = true,
         val item: MediaItem? = null,
+        val parentSeries: MediaItem? = null,
         val seasons: List<MediaItem> = emptyList(),
         val selectedSeasonId: String? = null,
         val episodes: List<MediaItem> = emptyList(),
         val isLoadingEpisodes: Boolean = false,
         val nextEpisodeToPlay: MediaItem? = null,
+        val selectedEpisodeForDetail: MediaItem? = null,
+        val siblingEpisodes: List<MediaItem> = emptyList(),
+        val playlistItems: List<MediaItem> = emptyList(),
+        val isLoadingPlaylist: Boolean = false,
+        val nextPlaylistItemToPlay: MediaItem? = null,
+        val similarItems: List<MediaItem> = emptyList(),
+        val isLoadingSimilar: Boolean = false,
         val isFavorite: Boolean = false,
+        val isPlayed: Boolean = false,
         val errorMessage: String? = null,
         val sessionExpired: Boolean = false
     )
@@ -39,8 +48,14 @@ class MediaDetailViewModel(
     fun retry() = load()
 
     fun getPosterUrl(id: String): String = repository.getPosterUrl(id)
-    fun getBackdropUrl(id: String): String = repository.getBackdropUrl(id)
+    fun getBackdropUrl(id: String, index: Int = 0): String = repository.getBackdropUrl(id, index)
+    fun getLogoUrl(id: String): String = repository.getLogoUrl(id)
+    fun getPersonImageUrl(personId: String?, personName: String?): String = repository.getPersonImageUrl(personId, personName)
     fun getImageHeaders(): Map<String, String> = repository.getStreamHeaders()
+
+    fun showEpisodeDetail(episode: MediaItem?) {
+        _uiState.update { it.copy(selectedEpisodeForDetail = episode) }
+    }
 
     fun toggleFavorite() {
         val currentItem = _uiState.value.item ?: return
@@ -52,6 +67,45 @@ class MediaDetailViewModel(
                     // Revert on failure
                     _uiState.update { it.copy(isFavorite = currentFav) }
                 }
+        }
+    }
+
+    fun togglePlayed() {
+        val currentItem = _uiState.value.item ?: return
+        val currentlyPlayed = _uiState.value.isPlayed
+        _uiState.update { it.copy(isPlayed = !currentlyPlayed) }
+        viewModelScope.launch {
+            repository.togglePlayed(currentItem.id, currentlyPlayed)
+                .onFailure {
+                    // Revert on failure
+                    _uiState.update { it.copy(isPlayed = currentlyPlayed) }
+                }
+        }
+    }
+
+    fun toggleEpisodePlayed(episode: MediaItem) {
+        val currentlyPlayed = episode.userData?.played == true
+        val newUserData = (episode.userData ?: com.example.jellyfintv.data.model.UserData()).copy(
+            played = !currentlyPlayed,
+            playedPercentage = if (!currentlyPlayed) 100f else 0f
+        )
+        val updatedEp = episode.copy(userData = newUserData)
+
+        _uiState.update { current ->
+            val updatedEpisodes = current.episodes.map { if (it.id == episode.id) updatedEp else it }
+            val updatedSibling = current.siblingEpisodes.map { if (it.id == episode.id) updatedEp else it }
+            val updatedItem = if (current.item?.id == episode.id) updatedEp else current.item
+            val updatedSelected = if (current.selectedEpisodeForDetail?.id == episode.id) updatedEp else current.selectedEpisodeForDetail
+            current.copy(
+                episodes = updatedEpisodes,
+                siblingEpisodes = updatedSibling,
+                item = updatedItem,
+                selectedEpisodeForDetail = updatedSelected,
+                isPlayed = if (current.item?.id == episode.id) !currentlyPlayed else current.isPlayed
+            )
+        }
+        viewModelScope.launch {
+            repository.togglePlayed(episode.id, currentlyPlayed)
         }
     }
 
@@ -75,10 +129,24 @@ class MediaDetailViewModel(
             repository.getItemDetails(itemId)
                 .onSuccess { item ->
                     val isFav = item.userData?.isFavorite ?: false
-                    _uiState.update { it.copy(isLoading = false, item = item, isFavorite = isFav) }
+                    val isPlayed = item.userData?.played ?: false
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            item = item,
+                            isFavorite = isFav,
+                            isPlayed = isPlayed
+                        )
+                    }
+
+                    loadSimilarItems(item.id)
 
                     if (item.type.equals("Series", ignoreCase = true)) {
                         loadSeriesData(item.id)
+                    } else if (item.type.equals("Episode", ignoreCase = true)) {
+                        loadEpisodeParentAndSiblings(item)
+                    } else if (item.type.equals("Playlist", ignoreCase = true)) {
+                        loadPlaylistData(item.id)
                     }
                 }
                 .onFailure { e ->
@@ -88,6 +156,31 @@ class MediaDetailViewModel(
                         _uiState.update { it.copy(isLoading = false, errorMessage = e.message ?: "Failed to load details") }
                     }
                 }
+        }
+    }
+
+    private fun loadSimilarItems(targetId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingSimilar = true) }
+            repository.getSimilarItems(targetId)
+                .onSuccess { items ->
+                    _uiState.update { it.copy(similarItems = items, isLoadingSimilar = false) }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingSimilar = false) }
+                }
+        }
+    }
+
+    private fun loadEpisodeParentAndSiblings(episode: MediaItem) {
+        val seriesId = episode.seriesId ?: return
+        viewModelScope.launch {
+            repository.getItemDetails(seriesId).onSuccess { series ->
+                _uiState.update { it.copy(parentSeries = series) }
+            }
+            repository.getEpisodes(seriesId, episode.seasonId).onSuccess { siblingList ->
+                _uiState.update { it.copy(siblingEpisodes = siblingList) }
+            }
         }
     }
 
@@ -116,6 +209,26 @@ class MediaDetailViewModel(
                     isLoadingEpisodes = false
                 )
             }
+        }
+    }
+
+    private fun loadPlaylistData(playlistId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingPlaylist = true) }
+            repository.getPlaylistItems(playlistId)
+                .onSuccess { items ->
+                    val nextItem = items.firstOrNull { it.userData?.played != true } ?: items.firstOrNull()
+                    _uiState.update {
+                        it.copy(
+                            playlistItems = items,
+                            nextPlaylistItemToPlay = nextItem,
+                            isLoadingPlaylist = false
+                        )
+                    }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isLoadingPlaylist = false) }
+                }
         }
     }
 }

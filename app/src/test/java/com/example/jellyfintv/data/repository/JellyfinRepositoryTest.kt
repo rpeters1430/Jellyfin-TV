@@ -280,6 +280,83 @@ class JellyfinRepositoryTest {
     }
 
     @Test
+    fun `getPlaylistItems success returns the parsed items`() = runTest {
+        prefs.serverUrl = baseUrl()
+        prefs.token = "tok"
+        prefs.userId = "user-1"
+        val body = gson.toJson(
+            ItemsResponse(items = listOf(MediaItem(id = "pl-1", name = "YouTube Video 1"), MediaItem(id = "pl-2", name = "YouTube Video 2")))
+        )
+        server.enqueue(MockResponse().setResponseCode(200).setBody(body))
+
+        val result = repository.getPlaylistItems("playlist-1")
+
+        assertTrue(result.isSuccess)
+        assertEquals(listOf("pl-1", "pl-2"), result.getOrThrow().map { it.id })
+    }
+
+    @Test
+    fun `getPlaylistItems 401 maps to UnauthorizedException`() = runTest {
+        prefs.serverUrl = baseUrl()
+        prefs.token = "tok"
+        prefs.userId = "user-1"
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setResponseCode(401))
+
+        val result = repository.getPlaylistItems("playlist-1")
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is UnauthorizedException)
+    }
+
+    @Test
+    fun `demo mode - getPlaylistItems returns sample playlist items`() = runTest {
+        repository.authenticate("demo", "u", "p")
+
+        val result = repository.getPlaylistItems("mock-playlist-1")
+
+        assertTrue(result.isSuccess)
+        val items = result.getOrThrow()
+        assertTrue(items.isNotEmpty())
+        assertTrue(items.any { it.name.contains("Tokyo Rain") })
+    }
+
+    @Test
+    fun `demo mode - getUserViews includes playlists collection`() = runTest {
+        repository.authenticate("demo", "u", "p")
+
+        val result = repository.getUserViews()
+
+        assertTrue(result.isSuccess)
+        val views = result.getOrThrow()
+        assertTrue(views.any { it.collectionType == "playlists" || it.id == "view-playlists" })
+    }
+
+    @Test
+    fun `demo mode - getSimilarItems returns related sample items`() = runTest {
+        repository.authenticate("demo", "u", "p")
+
+        val result = repository.getSimilarItems("mock-1")
+
+        assertTrue(result.isSuccess)
+        val items = result.getOrThrow()
+        assertTrue(items.isNotEmpty())
+        assertTrue(items.none { it.id == "mock-1" })
+    }
+
+    @Test
+    fun `demo mode - togglePlayed flips played status`() = runTest {
+        repository.authenticate("demo", "u", "p")
+
+        val result = repository.togglePlayed("mock-1", currentlyPlayed = false)
+
+        assertTrue(result.isSuccess)
+        val userData = result.getOrThrow()
+        assertTrue(userData.played == true)
+        assertEquals(100f, userData.playedPercentage)
+    }
+
+    @Test
     fun `logout clears preferences`() {
         prefs.serverUrl = baseUrl()
         prefs.token = "tok"

@@ -75,9 +75,10 @@ class LibraryViewModel(
                 val types = when (collectionType?.lowercase()) {
                     "movies" -> "Movie"
                     "tvshows" -> "Series"
+                    "playlists" -> "Playlist"
                     "music" -> "MusicAlbum,Audio"
                     "homevideos", "photos" -> "Video,Photo"
-                    else -> "Movie,Series,MusicAlbum,Video"
+                    else -> "Movie,Series,MusicAlbum,Video,Playlist"
                 }
                 repository.getLibraryItems(includeItemTypes = types, sortBy = sort.sortBy, sortOrder = sort.sortOrder)
             }

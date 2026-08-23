@@ -59,4 +59,18 @@ class LibraryViewModelTest {
             assertEquals(listOf(movieItem), state.items)
         }
     }
+
+    @Test
+    fun `loads playlist items when collectionType is playlists`() = runTest {
+        val playlistItem = item("pl-1", "Lofi Beats", type = "Playlist")
+        coEvery { repository.getLibraryItems(includeItemTypes = "Playlist", any(), any()) } returns Result.success(listOf(playlistItem))
+
+        val viewModel = LibraryViewModel(collectionType = "playlists", repository = repository)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertFalse(state.isLoading)
+            assertEquals(listOf(playlistItem), state.items)
+        }
+    }
 }

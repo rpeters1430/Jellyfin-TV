@@ -46,7 +46,7 @@ fun SearchScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val imageHeaders = viewModel.getImageHeaders()
-    val suggestedGenres = remember { listOf("Sci-Fi", "Action", "Drama", "Comedy", "Thriller", "Adventure") }
+    val suggestedGenres = remember { listOf("Sci-Fi", "Action", "YouTube", "Lofi", "Drama", "Comedy", "Thriller", "Adventure") }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current

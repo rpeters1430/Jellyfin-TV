@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
@@ -118,9 +119,13 @@ fun PlayerScreen(
     var currentSpeed by remember { mutableStateOf(1.0f) }
     var showTrackDialog by remember { mutableStateOf(false) }
     var showEpisodesDrawer by remember { mutableStateOf(false) }
+    var showPlaylistDrawer by remember { mutableStateOf(false) }
     var showInfoOverlay by remember { mutableStateOf(false) }
     var nextEpisode by remember { mutableStateOf<MediaItem?>(null) }
     var allSeasonEpisodes by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
+    var nextPlaylistItem by remember { mutableStateOf<MediaItem?>(null) }
+    var previousPlaylistItem by remember { mutableStateOf<MediaItem?>(null) }
+    var allPlaylistItems by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
     var autoPlayCountdown by remember { mutableStateOf<Int?>(null) }
 
     val exoPlayer = remember {
@@ -184,13 +189,29 @@ fun PlayerScreen(
         }
     }
 
-    // Load media & episodes
+    // Load media & episodes / playlist queue
     LaunchedEffect(media.id) {
         nextEpisode = null
         allSeasonEpisodes = emptyList()
+        nextPlaylistItem = null
+        previousPlaylistItem = null
+        allPlaylistItems = emptyList()
         autoPlayCountdown = null
         playerError = null
         lastReportedPositionMs = -10_000L
+
+        // If a playlist container was passed directly, play its first unwatched item
+        if (media.type.equals("Playlist", ignoreCase = true)) {
+            repository.getPlaylistItems(media.id).onSuccess { items ->
+                if (items.isNotEmpty()) {
+                    val target = items.firstOrNull { it.userData?.played != true } ?: items.first()
+                    if (onPlayNext != null) {
+                        onPlayNext(target)
+                        return@onSuccess
+                    }
+                }
+            }
+        }
 
         exoPlayer.setMediaItem(Media3Item.fromUri(Uri.parse(streamUrl)))
         val startPositionTicks = media.userData?.playbackPositionTicks ?: 0L
@@ -202,11 +223,28 @@ fun PlayerScreen(
 
         val seriesId = media.seriesId
         if (!seriesId.isNullOrBlank()) {
-            repository.getEpisodes(seriesId).onSuccess { eps ->
-                allSeasonEpisodes = eps
-                val currIdx = eps.indexOfFirst { it.id == media.id }
-                if (currIdx >= 0 && currIdx + 1 < eps.size) {
-                    nextEpisode = eps[currIdx + 1]
+            if (media.type.equals("Episode", ignoreCase = true)) {
+                repository.getEpisodes(seriesId).onSuccess { eps ->
+                    allSeasonEpisodes = eps
+                    val currIdx = eps.indexOfFirst { it.id == media.id }
+                    if (currIdx >= 0 && currIdx + 1 < eps.size) {
+                        nextEpisode = eps[currIdx + 1]
+                    }
+                }
+            } else {
+                repository.getPlaylistItems(seriesId).onSuccess { items ->
+                    if (items.isNotEmpty()) {
+                        allPlaylistItems = items
+                        val currIdx = items.indexOfFirst { it.id == media.id }
+                        if (currIdx >= 0) {
+                            if (currIdx + 1 < items.size) {
+                                nextPlaylistItem = items[currIdx + 1]
+                            }
+                            if (currIdx > 0) {
+                                previousPlaylistItem = items[currIdx - 1]
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -233,6 +271,32 @@ fun PlayerScreen(
         }
     }
 
+    fun playNextPlaylistItemNow() {
+        val next = nextPlaylistItem ?: return
+        val positionTicks = exoPlayer.currentPosition * 10_000L
+        coroutineScope.launch {
+            repository.reportPlayingStopped(media.id, positionTicks)
+            if (onPlayNext != null) {
+                onPlayNext(next)
+            } else {
+                onBack()
+            }
+        }
+    }
+
+    fun playPreviousPlaylistItemNow() {
+        val prev = previousPlaylistItem ?: return
+        val positionTicks = exoPlayer.currentPosition * 10_000L
+        coroutineScope.launch {
+            repository.reportPlayingStopped(media.id, positionTicks)
+            if (onPlayNext != null) {
+                onPlayNext(prev)
+            } else {
+                onBack()
+            }
+        }
+    }
+
     fun switchEpisode(ep: MediaItem) {
         val positionTicks = exoPlayer.currentPosition * 10_000L
         coroutineScope.launch {
@@ -240,6 +304,19 @@ fun PlayerScreen(
             showEpisodesDrawer = false
             if (onPlayNext != null) {
                 onPlayNext(ep)
+            } else {
+                onBack()
+            }
+        }
+    }
+
+    fun switchPlaylistItem(item: MediaItem) {
+        val positionTicks = exoPlayer.currentPosition * 10_000L
+        coroutineScope.launch {
+            repository.reportPlayingStopped(media.id, positionTicks)
+            showPlaylistDrawer = false
+            if (onPlayNext != null) {
+                onPlayNext(item)
             } else {
                 onBack()
             }
@@ -330,8 +407,12 @@ fun PlayerScreen(
                     bufferedPosition = exoPlayer.bufferedPosition
                     playerError = null
                 }
-                if (state == Player.STATE_ENDED && nextEpisode != null) {
-                    playNextEpisodeNow()
+                if (state == Player.STATE_ENDED) {
+                    if (nextEpisode != null) {
+                        playNextEpisodeNow()
+                    } else if (nextPlaylistItem != null) {
+                        playNextPlaylistItemNow()
+                    }
                 }
             }
 
@@ -782,8 +863,15 @@ fun PlayerScreen(
                                 )
                             )
                             if (!media.seriesName.isNullOrEmpty()) {
+                                val subText = if (allPlaylistItems.isNotEmpty()) {
+                                    val currIdx = allPlaylistItems.indexOfFirst { it.id == media.id }
+                                    val idxText = if (currIdx >= 0) " • Video ${currIdx + 1} of ${allPlaylistItems.size}" else ""
+                                    "${media.seriesName}$idxText"
+                                } else {
+                                    "${media.seriesName} • S${media.seasonIndex ?: 1}:E${media.episodeIndex ?: 1}"
+                                }
                                 Text(
-                                    text = "${media.seriesName} • S${media.seasonIndex ?: 1}:E${media.episodeIndex ?: 1}",
+                                    text = subText,
                                     style = MaterialTheme.typography.bodyMedium.copy(color = TextSecondary)
                                 )
                             }
@@ -795,6 +883,24 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        if (allPlaylistItems.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(JellyfinBlue.copy(alpha = 0.25f))
+                                    .border(1.dp, JellyfinBlue, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "PLAYLIST",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = JellyfinBlue,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                        }
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
@@ -845,7 +951,7 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Left Options: Speed & In-Player Episode Browser
+                        // Left Options: Speed & In-Player Episode / Playlist Browser
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -916,13 +1022,75 @@ fun PlayerScreen(
                                     }
                                 }
                             }
+
+                            // Playlist Queue Button (if playlist)
+                            if (allPlaylistItems.isNotEmpty()) {
+                                val plSource = remember { MutableInteractionSource() }
+                                var plFocused by remember { mutableStateOf(false) }
+                                val plHovered by plSource.collectIsHoveredAsState()
+                                val plHighlighted = plFocused || plHovered
+
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (plHighlighted) FocusRingColor else CardSurface)
+                                        .hoverable(plSource)
+                                        .clickable(interactionSource = plSource, indication = null) {
+                                            showPlaylistDrawer = true
+                                        }
+                                        .onFocusChanged { plFocused = it.isFocused }
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                                            contentDescription = "Playlist Queue",
+                                            tint = if (plHighlighted) Color.White else TextPrimary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Queue (${allPlaylistItems.size})",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = if (plHighlighted) Color.White else TextPrimary,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                    }
+                                }
+                            }
                         }
 
-                        // Center Transport Buttons: Rewind, Play/Pause, Forward, Next
+                        // Center Transport Buttons: Previous, Rewind, Play/Pause, Forward, Next
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(18.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Previous Playlist Item Button (if available)
+                            if (previousPlaylistItem != null) {
+                                val prevSource = remember { MutableInteractionSource() }
+                                var prevFocused by remember { mutableStateOf(false) }
+                                val prevHovered by prevSource.collectIsHoveredAsState()
+                                val prevHighlighted = prevFocused || prevHovered
+
+                                IconButton(
+                                    onClick = { playPreviousPlaylistItemNow() },
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(if (prevHighlighted) FocusRingColor else CardSurface)
+                                        .hoverable(prevSource)
+                                        .onFocusChanged { prevFocused = it.isFocused }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SkipPrevious,
+                                        contentDescription = "Previous Video",
+                                        tint = if (prevHighlighted) Color.White else TextPrimary
+                                    )
+                                }
+                            }
+
                             val rewindSource = remember { MutableInteractionSource() }
                             var rewindFocused by remember { mutableStateOf(false) }
                             val rewindHovered by rewindSource.collectIsHoveredAsState()
@@ -985,15 +1153,21 @@ fun PlayerScreen(
                                 )
                             }
 
-                            // Next Episode Button (if available)
-                            if (nextEpisode != null) {
+                            // Next Episode / Playlist Video Button (if available)
+                            if (nextEpisode != null || nextPlaylistItem != null) {
                                 val nextSource = remember { MutableInteractionSource() }
                                 var nextFocused by remember { mutableStateOf(false) }
                                 val nextHovered by nextSource.collectIsHoveredAsState()
                                 val nextHighlighted = nextFocused || nextHovered
 
                                 IconButton(
-                                    onClick = { playNextEpisodeNow() },
+                                    onClick = {
+                                        if (nextEpisode != null) {
+                                            playNextEpisodeNow()
+                                        } else {
+                                            playNextPlaylistItemNow()
+                                        }
+                                    },
                                     modifier = Modifier
                                         .clip(CircleShape)
                                         .background(if (nextHighlighted) FocusRingColor else CardSurface)
@@ -1002,7 +1176,7 @@ fun PlayerScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.SkipNext,
-                                        contentDescription = "Next Episode",
+                                        contentDescription = if (nextEpisode != null) "Next Episode" else "Next Video",
                                         tint = if (nextHighlighted) Color.White else TextPrimary
                                     )
                                 }
@@ -1299,6 +1473,164 @@ fun PlayerScreen(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // In-Player Playlist Queue Drawer
+        if (showPlaylistDrawer) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.72f))
+                    .clickable { showPlaylistDrawer = false },
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CardSurface)
+                        .padding(24.dp)
+                        .clickable(enabled = false) {}
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.PlaylistPlay,
+                                    contentDescription = "Playlist Queue",
+                                    tint = JellyfinBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Text(
+                                    text = "Playlist Queue (${allPlaylistItems.size} Videos)",
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        color = TextPrimary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                            IconButton(onClick = { showPlaylistDrawer = false }) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            contentPadding = PaddingValues(bottom = 12.dp)
+                        ) {
+                            items(allPlaylistItems, key = { it.id }) { item ->
+                                val isCurrent = item.id == media.id
+                                val itemSource = remember { MutableInteractionSource() }
+                                var itemFocused by remember { mutableStateOf(false) }
+                                val itemHovered by itemSource.collectIsHoveredAsState()
+                                val itemHighlighted = itemFocused || itemHovered
+                                val itemIndex = item.episodeIndex ?: (allPlaylistItems.indexOf(item) + 1)
+
+                                Column(
+                                    modifier = Modifier
+                                        .width(220.dp)
+                                        .zIndex(if (itemHighlighted) 10f else 0f)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isCurrent) JellyfinBlue.copy(alpha = 0.25f) else CardSurfaceVariant)
+                                        .border(
+                                            width = if (itemHighlighted) 2.5.dp else if (isCurrent) 1.5.dp else 1.dp,
+                                            color = if (itemHighlighted) FocusRingColor else if (isCurrent) JellyfinBlue else Color.Transparent,
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                        .hoverable(itemSource)
+                                        .onFocusChanged { itemFocused = it.isFocused }
+                                        .clickable(interactionSource = itemSource, indication = null) {
+                                            switchPlaylistItem(item)
+                                        }
+                                        .padding(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(120.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.Black.copy(alpha = 0.5f))
+                                    ) {
+                                        AuthenticatedAsyncImage(
+                                            url = repository.getPosterUrl(item.id),
+                                            headers = imageHeaders,
+                                            contentDescription = item.name,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopStart)
+                                                .padding(6.dp)
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(Color.Black.copy(alpha = 0.8f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "#$itemIndex",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            )
+                                        }
+                                        if (isCurrent) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .align(Alignment.BottomEnd)
+                                                    .padding(6.dp)
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(JellyfinBlue)
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = "NOW PLAYING",
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        color = Color.White,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 8.sp
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = item.name,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (itemHighlighted) FocusRingColor else TextPrimary
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+
+                                    if (item.durationMinutes > 0) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "${item.durationMinutes} min",
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                color = TextSecondary,
+                                                fontSize = 11.sp
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }

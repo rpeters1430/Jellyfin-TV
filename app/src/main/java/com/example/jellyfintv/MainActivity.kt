@@ -169,6 +169,7 @@ class MainActivity : ComponentActivity() {
                                 itemId = screen.itemId,
                                 repository = repository,
                                 onPlay = { media -> currentScreen = Screen.Player(media) },
+                                onNavigateMedia = { media -> currentScreen = Screen.Detail(media.id) },
                                 onBack = { currentScreen = Screen.Home },
                                 onLogout = handleLogout
                             )

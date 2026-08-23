@@ -123,7 +123,16 @@ class SearchViewModelTest {
             assertEquals(listOf(series), state.filteredResults)
         }
 
-        coVerify(exactly = 1) { repository.searchMedia(any()) }
+        val playlist = item("pl1", "Lofi Beats", "Playlist")
+        coEvery { repository.searchMedia("lofi") } returns Result.success(listOf(movie, playlist))
+        viewModel.onQueryChange("lofi")
+        advancePastDebounce()
+
+        viewModel.setFilter(SearchFilter.PLAYLISTS)
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertEquals(listOf(playlist), state.filteredResults)
+        }
     }
 
     @Test

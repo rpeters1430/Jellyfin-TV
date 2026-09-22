@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -72,13 +73,13 @@ import com.example.jellyfintv.ui.components.AuthenticatedAsyncImage
 import com.example.jellyfintv.ui.theme.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(UnstableApi::class)
 enum class VideoAspectRatio(val label: String, val resizeMode: Int) {
     FIT("Fit (16:9)", AspectRatioFrameLayout.RESIZE_MODE_FIT),
     ZOOM("Zoom / Crop", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
@@ -101,7 +102,11 @@ data class ActionHudState(
 private const val SEEK_INCREMENT_MS = 10_000L
 
 private fun ExoPlayer.rewind() = seekTo((currentPosition - SEEK_INCREMENT_MS).coerceAtLeast(0))
-private fun ExoPlayer.fastForward() = seekTo((currentPosition + SEEK_INCREMENT_MS).coerceAtMost(duration))
+private fun ExoPlayer.fastForward() {
+    val target = currentPosition + SEEK_INCREMENT_MS
+    // duration is C.TIME_UNSET (negative) until the stream is ready; clamping to it would seek to 0.
+    seekTo(if (duration == C.TIME_UNSET) target else target.coerceAtMost(duration))
+}
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -156,6 +161,11 @@ fun PlayerScreen(
     var accumulatedSeekSeconds by remember { mutableStateOf(10) }
 
     val focusRequester = remember { FocusRequester() }
+    val playButtonFocus = remember { FocusRequester() }
+    // True only while the root box itself holds focus (not one of the control buttons).
+    var rootFocused by remember { mutableStateOf(true) }
+    // Bumped on every key press so the auto-hide timer restarts while navigating the controls.
+    var controlsInteractionTick by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
     val exitReportScope = remember { CoroutineScope(SupervisorJob()) }
 
@@ -202,15 +212,14 @@ fun PlayerScreen(
 
         // If a playlist container was passed directly, play its first unwatched item
         if (media.type.equals("Playlist", ignoreCase = true)) {
-            repository.getPlaylistItems(media.id).onSuccess { items ->
-                if (items.isNotEmpty()) {
-                    val target = items.firstOrNull { it.userData?.played != true } ?: items.first()
-                    if (onPlayNext != null) {
-                        onPlayNext(target)
-                        return@onSuccess
-                    }
-                }
+            val items = repository.getPlaylistItems(media.id).getOrNull().orEmpty()
+            if (items.isEmpty() || onPlayNext == null) {
+                // There's no stream behind a playlist container itself, so don't try to play it.
+                playerError = "Nothing to play"
+                return@LaunchedEffect
             }
+            onPlayNext(items.firstOrNull { it.userData?.played != true } ?: items.first())
+            return@LaunchedEffect
         }
 
         exoPlayer.setMediaItem(Media3Item.fromUri(Uri.parse(streamUrl)))
@@ -250,78 +259,55 @@ fun PlayerScreen(
         }
     }
 
-    fun exitPlayer() {
+    // Fire-and-forget: never make navigation wait on the network (the read timeout is 30s).
+    fun reportStopped() {
+        val itemId = media.id
         val positionTicks = exoPlayer.currentPosition * 10_000L
-        coroutineScope.launch {
-            repository.reportPlayingStopped(media.id, positionTicks)
+        exitReportScope.launch { repository.reportPlayingStopped(itemId, positionTicks) }
+    }
+
+    // The final stop report for leaving the player is sent by the DisposableEffect's onDispose,
+    // which covers this path and every other one (e.g. MainActivity's system BackHandler).
+    fun exitPlayer() {
+        onBack()
+    }
+
+    fun playMedia(next: MediaItem) {
+        reportStopped()
+        if (onPlayNext != null) {
+            onPlayNext(next)
+        } else {
             onBack()
         }
     }
 
     fun playNextEpisodeNow() {
-        val next = nextEpisode ?: return
-        val positionTicks = exoPlayer.currentPosition * 10_000L
-        coroutineScope.launch {
-            repository.reportPlayingStopped(media.id, positionTicks)
-            if (onPlayNext != null) {
-                onPlayNext(next)
-            } else {
-                onBack()
-            }
-        }
+        nextEpisode?.let { playMedia(it) }
     }
 
     fun playNextPlaylistItemNow() {
-        val next = nextPlaylistItem ?: return
-        val positionTicks = exoPlayer.currentPosition * 10_000L
-        coroutineScope.launch {
-            repository.reportPlayingStopped(media.id, positionTicks)
-            if (onPlayNext != null) {
-                onPlayNext(next)
-            } else {
-                onBack()
-            }
-        }
+        nextPlaylistItem?.let { playMedia(it) }
     }
 
     fun playPreviousPlaylistItemNow() {
-        val prev = previousPlaylistItem ?: return
-        val positionTicks = exoPlayer.currentPosition * 10_000L
-        coroutineScope.launch {
-            repository.reportPlayingStopped(media.id, positionTicks)
-            if (onPlayNext != null) {
-                onPlayNext(prev)
-            } else {
-                onBack()
-            }
-        }
+        previousPlaylistItem?.let { playMedia(it) }
     }
 
     fun switchEpisode(ep: MediaItem) {
-        val positionTicks = exoPlayer.currentPosition * 10_000L
-        coroutineScope.launch {
-            repository.reportPlayingStopped(media.id, positionTicks)
-            showEpisodesDrawer = false
-            if (onPlayNext != null) {
-                onPlayNext(ep)
-            } else {
-                onBack()
-            }
-        }
+        showEpisodesDrawer = false
+        playMedia(ep)
     }
 
     fun switchPlaylistItem(item: MediaItem) {
-        val positionTicks = exoPlayer.currentPosition * 10_000L
-        coroutineScope.launch {
-            repository.reportPlayingStopped(media.id, positionTicks)
-            showPlaylistDrawer = false
-            if (onPlayNext != null) {
-                onPlayNext(item)
-            } else {
-                onBack()
-            }
-        }
+        showPlaylistDrawer = false
+        playMedia(item)
     }
+
+    // The player listener below is registered once, so it must go through these rather than
+    // capture the first composition's `media`/`onPlayNext` (which go stale after auto-play).
+    val latestMedia by rememberUpdatedState(media)
+    val latestPlayNextEpisode by rememberUpdatedState({ playNextEpisodeNow() })
+    val latestPlayNextPlaylistItem by rememberUpdatedState({ playNextPlaylistItemNow() })
 
     fun triggerRewind() {
         val now = System.currentTimeMillis()
@@ -392,7 +378,7 @@ fun PlayerScreen(
                 if (!playing && playerError == null) {
                     coroutineScope.launch {
                         repository.reportPlayingProgress(
-                            itemId = media.id,
+                            itemId = latestMedia.id,
                             positionTicks = exoPlayer.currentPosition * 10_000L,
                             isPaused = true
                         )
@@ -409,9 +395,9 @@ fun PlayerScreen(
                 }
                 if (state == Player.STATE_ENDED) {
                     if (nextEpisode != null) {
-                        playNextEpisodeNow()
+                        latestPlayNextEpisode()
                     } else if (nextPlaylistItem != null) {
-                        playNextPlaylistItemNow()
+                        latestPlayNextPlaylistItem()
                     }
                 }
             }
@@ -429,22 +415,29 @@ fun PlayerScreen(
         exoPlayer.addListener(listener)
 
         onDispose {
+            val itemId = latestMedia.id
             val positionTicks = exoPlayer.currentPosition * 10_000L
             exoPlayer.removeListener(listener)
             exoPlayer.release()
             exitReportScope.launch {
-                repository.reportPlayingStopped(media.id, positionTicks)
-            }.invokeOnCompletion {
-                exitReportScope.cancel()
+                repository.reportPlayingStopped(itemId, positionTicks)
             }
         }
     }
 
     // Auto-hide controls overlay after 6s (unless sheets/dialogs open)
-    LaunchedEffect(showControls, showTrackDialog, showEpisodesDrawer, showInfoOverlay) {
-        if (showControls && !showTrackDialog && !showEpisodesDrawer && !showInfoOverlay) {
+    LaunchedEffect(showControls, showTrackDialog, showEpisodesDrawer, showPlaylistDrawer, showInfoOverlay, controlsInteractionTick) {
+        if (showControls && !showTrackDialog && !showEpisodesDrawer && !showPlaylistDrawer && !showInfoOverlay) {
             delay(6000)
             showControls = false
+        }
+    }
+
+    // The focused element leaves composition when the controls hide or a sheet/drawer closes;
+    // take focus back so the remote goes to seek/play-pause instead of into nothing.
+    LaunchedEffect(showControls, showTrackDialog, showEpisodesDrawer, showPlaylistDrawer) {
+        if (!showTrackDialog && !showEpisodesDrawer && !showPlaylistDrawer) {
+            runCatching { focusRequester.requestFocus() }
         }
     }
 
@@ -466,10 +459,12 @@ fun PlayerScreen(
             }
 
             // Sync with Jellyfin roughly every 10 seconds of playback
-            if (currentPosition - lastReportedPositionMs >= 10000) {
+            // abs(): after rewinding past the last report the difference goes negative, which
+            // would otherwise silence progress reports until playback caught back up.
+            if (kotlin.math.abs(currentPosition - lastReportedPositionMs) >= 10000) {
                 lastReportedPositionMs = currentPosition
                 repository.reportPlayingProgress(
-                    itemId = media.id,
+                    itemId = latestMedia.id,
                     positionTicks = currentPosition * 10_000L,
                     isPaused = !isPlaying
                 )
@@ -482,33 +477,31 @@ fun PlayerScreen(
             .fillMaxSize()
             .background(Color.Black)
             .focusRequester(focusRequester)
+            .onFocusChanged { rootFocused = it.isFocused }
             .focusable()
             .onKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyDown) {
-                    if (showTrackDialog) {
-                        if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                            showTrackDialog = false
-                            return@onKeyEvent true
-                        }
-                        return@onKeyEvent false
-                    }
+                if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+                controlsInteractionTick++
+                val isBack = keyEvent.key == Key.Back || keyEvent.key == Key.Escape
 
-                    if (showEpisodesDrawer) {
-                        if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                            showEpisodesDrawer = false
-                            return@onKeyEvent true
+                when {
+                    // Sheets/drawers: Back closes them; every other key falls through to the
+                    // focus system so the D-pad can move around inside them.
+                    showTrackDialog -> isBack.also { if (it) showTrackDialog = false }
+                    showEpisodesDrawer -> isBack.also { if (it) showEpisodesDrawer = false }
+                    showPlaylistDrawer -> isBack.also { if (it) showPlaylistDrawer = false }
+                    isBack -> {
+                        when {
+                            showInfoOverlay -> showInfoOverlay = false
+                            showControls -> showControls = false
+                            else -> exitPlayer()
                         }
-                        return@onKeyEvent false
+                        true
                     }
-
-                    if (showInfoOverlay) {
-                        if (keyEvent.key == Key.Back || keyEvent.key == Key.Escape) {
-                            showInfoOverlay = false
-                            return@onKeyEvent true
-                        }
-                    }
-
-                    when (keyEvent.key) {
+                    // A control button has focus: leave D-pad keys to it and the focus system.
+                    // (Consuming them here is what made the control bar unreachable by remote.)
+                    !rootFocused -> false
+                    else -> when (keyEvent.key) {
                         Key.DirectionCenter, Key.Enter, Key.Spacebar -> {
                             togglePlayPause()
                             true
@@ -527,21 +520,17 @@ fun PlayerScreen(
                             true
                         }
                         Key.DirectionDown -> {
-                            showControls = true
-                            true
-                        }
-                        Key.Back, Key.Escape -> {
+                            // First press reveals the controls; the next moves focus onto them.
                             if (showControls) {
-                                showControls = false
-                                true
+                                runCatching { playButtonFocus.requestFocus() }
                             } else {
-                                exitPlayer()
-                                true
+                                showControls = true
                             }
+                            true
                         }
                         else -> false
                     }
-                } else false
+                }
             }
     ) {
         // ExoPlayer Native View
@@ -966,13 +955,13 @@ fun PlayerScreen(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (speedHighlighted) FocusRingColor else CardSurface)
                                     .hoverable(speedSource)
+                                    .onFocusChanged { speedFocused = it.isFocused }
                                     .clickable(interactionSource = speedSource, indication = null) {
                                         val speeds = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
                                         val nextIdx = (speeds.indexOf(currentSpeed) + 1) % speeds.size
                                         currentSpeed = speeds[nextIdx]
                                         exoPlayer.playbackParameters = PlaybackParameters(currentSpeed)
                                     }
-                                    .onFocusChanged { speedFocused = it.isFocused }
                                     .padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
                                 Text(
@@ -996,10 +985,10 @@ fun PlayerScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (epsHighlighted) FocusRingColor else CardSurface)
                                         .hoverable(epsSource)
+                                        .onFocusChanged { epsFocused = it.isFocused }
                                         .clickable(interactionSource = epsSource, indication = null) {
                                             showEpisodesDrawer = true
                                         }
-                                        .onFocusChanged { epsFocused = it.isFocused }
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
                                     Row(
@@ -1035,10 +1024,10 @@ fun PlayerScreen(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (plHighlighted) FocusRingColor else CardSurface)
                                         .hoverable(plSource)
+                                        .onFocusChanged { plFocused = it.isFocused }
                                         .clickable(interactionSource = plSource, indication = null) {
                                             showPlaylistDrawer = true
                                         }
-                                        .onFocusChanged { plFocused = it.isFocused }
                                         .padding(horizontal = 12.dp, vertical = 8.dp)
                                 ) {
                                     Row(
@@ -1123,6 +1112,7 @@ fun PlayerScreen(
                                     .clip(CircleShape)
                                     .background(if (playHighlighted) FocusRingColor else JellyfinBlue)
                                     .hoverable(playSource)
+                                    .focusRequester(playButtonFocus)
                                     .onFocusChanged { playFocused = it.isFocused }
                             ) {
                                 Icon(
@@ -1223,12 +1213,12 @@ fun PlayerScreen(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (aspectHighlighted) FocusRingColor else CardSurface)
                                     .hoverable(aspectSource)
+                                    .onFocusChanged { aspectFocused = it.isFocused }
                                     .clickable(interactionSource = aspectSource, indication = null) {
                                         val modes = VideoAspectRatio.entries
                                         val nextIdx = (modes.indexOf(selectedAspectRatio) + 1) % modes.size
                                         selectedAspectRatio = modes[nextIdx]
                                     }
-                                    .onFocusChanged { aspectFocused = it.isFocused }
                                     .padding(horizontal = 12.dp, vertical = 8.dp)
                             ) {
                                 Text(
@@ -1401,7 +1391,17 @@ fun PlayerScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        val listState = rememberLazyListState(
+                            initialFirstVisibleItemIndex = allSeasonEpisodes.indexOfFirst { it.id == media.id }.coerceAtLeast(0)
+                        )
+                        val currentItemFocus = remember { FocusRequester() }
+                        LaunchedEffect(Unit) {
+                            withFrameNanos { } // wait for the row to lay out its items
+                            runCatching { currentItemFocus.requestFocus() }
+                        }
+
                         LazyRow(
+                            state = listState,
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             contentPadding = PaddingValues(bottom = 12.dp)
                         ) {
@@ -1425,6 +1425,7 @@ fun PlayerScreen(
                                         )
                                         .hoverable(epSource)
                                         .onFocusChanged { epFocused = it.isFocused }
+                                        .then(if (isCurrent) Modifier.focusRequester(currentItemFocus) else Modifier)
                                         .clickable(interactionSource = epSource, indication = null) {
                                             switchEpisode(ep)
                                         }
@@ -1528,7 +1529,17 @@ fun PlayerScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        val listState = rememberLazyListState(
+                            initialFirstVisibleItemIndex = allPlaylistItems.indexOfFirst { it.id == media.id }.coerceAtLeast(0)
+                        )
+                        val currentItemFocus = remember { FocusRequester() }
+                        LaunchedEffect(Unit) {
+                            withFrameNanos { } // wait for the row to lay out its items
+                            runCatching { currentItemFocus.requestFocus() }
+                        }
+
                         LazyRow(
+                            state = listState,
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             contentPadding = PaddingValues(bottom = 12.dp)
                         ) {
@@ -1553,6 +1564,7 @@ fun PlayerScreen(
                                         )
                                         .hoverable(itemSource)
                                         .onFocusChanged { itemFocused = it.isFocused }
+                                        .then(if (isCurrent) Modifier.focusRequester(currentItemFocus) else Modifier)
                                         .clickable(interactionSource = itemSource, indication = null) {
                                             switchPlaylistItem(item)
                                         }
@@ -1682,6 +1694,12 @@ private fun TrackSelectorSheet(
     onSelectTrack: (Tracks.Group, Int) -> Unit,
     onDisableSubtitles: () -> Unit
 ) {
+    val firstItemFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { } // wait for the list to lay out its first item
+        runCatching { firstItemFocus.requestFocus() }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxHeight()
@@ -1736,8 +1754,9 @@ private fun TrackSelectorSheet(
                             .clip(RoundedCornerShape(8.dp))
                             .background(if (offHighlighted) FocusRingColor else CardSurfaceVariant)
                             .hoverable(offSource)
-                            .clickable(interactionSource = offSource, indication = null) { onDisableSubtitles() }
                             .onFocusChanged { offFocused = it.isFocused }
+                            .focusRequester(firstItemFocus)
+                            .clickable(interactionSource = offSource, indication = null) { onDisableSubtitles() }
                             .padding(12.dp)
                     ) {
                         Text("Off / Disabled", color = if (offHighlighted) Color.White else TextPrimary)
@@ -1765,8 +1784,8 @@ private fun TrackSelectorSheet(
                                     else CardSurfaceVariant
                                 )
                                 .hoverable(trackSource)
-                                .clickable(interactionSource = trackSource, indication = null) { onSelectTrack(group, i) }
                                 .onFocusChanged { isFocused = it.isFocused }
+                                .clickable(interactionSource = trackSource, indication = null) { onSelectTrack(group, i) }
                                 .padding(12.dp)
                         ) {
                             Text(text = label, color = if (isHighlighted) Color.White else TextPrimary)
@@ -1807,8 +1826,8 @@ private fun TrackSelectorSheet(
                                     else CardSurfaceVariant
                                 )
                                 .hoverable(trackSource)
-                                .clickable(interactionSource = trackSource, indication = null) { onSelectTrack(group, i) }
                                 .onFocusChanged { isFocused = it.isFocused }
+                                .clickable(interactionSource = trackSource, indication = null) { onSelectTrack(group, i) }
                                 .padding(12.dp)
                         ) {
                             Text(text = label, color = if (isHighlighted) Color.White else TextPrimary)

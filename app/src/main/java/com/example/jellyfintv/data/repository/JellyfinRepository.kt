@@ -79,7 +79,7 @@ class JellyfinRepository(val prefs: ServerPreferences) {
                 val api = RetrofitClient.getApi(candidate, trustSelfSignedCerts)
                 val response = api.authenticateByName(
                     authHeader = getAuthHeader(),
-                    request = AuthRequest(username = username, pw = pass, password = pass)
+                    request = AuthRequest(username = username, pw = pass)
                 )
 
                 if (response.isSuccessful && response.body() != null) {
@@ -367,7 +367,7 @@ class JellyfinRepository(val prefs: ServerPreferences) {
         }
         try {
             val api = api()
-            api.getItemDetails(getAuthHeader(), prefs.userId, itemId)
+            api.getItemDetails(authHeader = getAuthHeader(), itemId = itemId, userId = prefs.userId)
                 .toResult("Could not fetch item details")
         } catch (e: Exception) {
             Result.failure(e)
@@ -530,9 +530,9 @@ class JellyfinRepository(val prefs: ServerPreferences) {
         try {
             val api = api()
             val response = if (currentlyPlayed) {
-                api.unmarkPlayed(getAuthHeader(), prefs.userId, itemId)
+                api.unmarkPlayed(authHeader = getAuthHeader(), itemId = itemId, userId = prefs.userId)
             } else {
-                api.markPlayed(getAuthHeader(), prefs.userId, itemId)
+                api.markPlayed(authHeader = getAuthHeader(), itemId = itemId, userId = prefs.userId)
             }
             response.toResult("Could not update watched status")
         } catch (e: Exception) {

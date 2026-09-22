@@ -4,8 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 data class AuthRequest(
     @SerializedName("Username") val username: String,
-    @SerializedName("Pw") val pw: String,
-    @SerializedName("Password") val password: String = pw
+    @SerializedName("Pw") val pw: String
 )
 
 data class AuthResult(
@@ -87,9 +86,7 @@ data class MediaItem(
     @SerializedName("ImageTags") val imageTags: Map<String, String>? = emptyMap(),
     @SerializedName("BackdropImageTags") val backdropImageTags: List<String>? = emptyList(),
     @SerializedName("MediaSources") val mediaSources: List<MediaSource>? = emptyList(),
-    @SerializedName("Container") val container: String? = null,
-    @SerializedName("Size") val size: Long? = null,
-    @SerializedName("Bitrate") val bitrate: Int? = null
+    @SerializedName("Container") val container: String? = null
 ) {
     val durationMinutes: Int
         get() = runTimeTicks?.let { (it / 600_000_000L).toInt() } ?: 0

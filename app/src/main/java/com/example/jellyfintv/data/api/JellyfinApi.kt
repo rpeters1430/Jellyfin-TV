@@ -12,18 +12,23 @@ interface JellyfinApi {
         @Body request: AuthRequest
     ): Response<AuthResult>
 
-    @GET("Users/{userId}/Views")
+    // Jellyfin 12 removed the old per-user "Users/{userId}/..." item routes (GetUserViews,
+    // GetResumeItems, GetLatestMedia, GetItems, GetItem, MarkPlayed/Unplayed all moved to a
+    // top-level route taking `userId` as a query parameter), so a request to the old paths 404s.
+    // `fields` may only contain ItemFields enum names; OfficialRating/CommunityRating/RunTimeTicks/
+    // UserData aren't in it (those are always returned), so don't list them.
+    @GET("UserViews")
     suspend fun getUserViews(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String
+        @Query("userId") userId: String
     ): Response<ViewsResponse>
 
-    @GET("Users/{userId}/Items/Resume")
+    @GET("UserItems/Resume")
     suspend fun getResumeItems(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
+        @Query("userId") userId: String,
         @Query("limit") limit: Int = 12,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,PrimaryImageAspectRatio"
+        @Query("fields") fields: String = "Overview,Genres,PrimaryImageAspectRatio"
     ): Response<ItemsResponse>
 
     @GET("Shows/NextUp")
@@ -31,36 +36,36 @@ interface JellyfinApi {
         @Header("Authorization") authHeader: String,
         @Query("userId") userId: String,
         @Query("limit") limit: Int = 12,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks"
+        @Query("fields") fields: String = "Overview,Genres"
     ): Response<ItemsResponse>
 
-    @GET("Users/{userId}/Items/Latest")
+    @GET("Items/Latest")
     suspend fun getLatestItems(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
+        @Query("userId") userId: String,
         @Query("parentId") parentId: String? = null,
         @Query("limit") limit: Int = 16,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks"
+        @Query("fields") fields: String = "Overview,Genres"
     ): Response<List<MediaItem>>
 
-    @GET("Users/{userId}/Items")
+    @GET("Items")
     suspend fun getItems(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
+        @Query("userId") userId: String,
         @Query("parentId") parentId: String? = null,
         @Query("includeItemTypes") includeItemTypes: String? = null, // "Movie", "Series"
         @Query("recursive") recursive: Boolean = true,
         @Query("sortBy") sortBy: String = "SortName",
         @Query("sortOrder") sortOrder: String = "Ascending",
         @Query("limit") limit: Int = 30,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,MediaSources"
+        @Query("fields") fields: String = "Overview,Genres,MediaSources"
     ): Response<ItemsResponse>
 
-    @GET("Users/{userId}/Items/{itemId}")
+    @GET("Items/{itemId}")
     suspend fun getItemDetails(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
-        @Path("itemId") itemId: String
+        @Path("itemId") itemId: String,
+        @Query("userId") userId: String
     ): Response<MediaItem>
 
     @GET("Shows/{seriesId}/Seasons")
@@ -68,7 +73,7 @@ interface JellyfinApi {
         @Header("Authorization") authHeader: String,
         @Path("seriesId") seriesId: String,
         @Query("userId") userId: String,
-        @Query("fields") fields: String = "Overview,UserData"
+        @Query("fields") fields: String = "Overview"
     ): Response<ItemsResponse>
 
     @GET("Shows/{seriesId}/Episodes")
@@ -77,7 +82,7 @@ interface JellyfinApi {
         @Path("seriesId") seriesId: String,
         @Query("seasonId") seasonId: String? = null,
         @Query("userId") userId: String,
-        @Query("fields") fields: String = "Overview,RunTimeTicks,UserData,PrimaryImageAspectRatio"
+        @Query("fields") fields: String = "Overview,PrimaryImageAspectRatio"
     ): Response<ItemsResponse>
 
     @GET("Playlists/{playlistId}/Items")
@@ -85,18 +90,18 @@ interface JellyfinApi {
         @Header("Authorization") authHeader: String,
         @Path("playlistId") playlistId: String,
         @Query("userId") userId: String,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,MediaSources,UserData,PrimaryImageAspectRatio"
+        @Query("fields") fields: String = "Overview,Genres,MediaSources,PrimaryImageAspectRatio"
     ): Response<ItemsResponse>
 
-    @GET("Users/{userId}/Items")
+    @GET("Items")
     suspend fun searchItems(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
+        @Query("userId") userId: String,
         @Query("searchTerm") searchTerm: String,
         @Query("includeItemTypes") includeItemTypes: String? = "Movie,Series,Episode,Video,MusicAlbum,Audio,Playlist",
         @Query("recursive") recursive: Boolean = true,
         @Query("limit") limit: Int = 40,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,PrimaryImageAspectRatio"
+        @Query("fields") fields: String = "Overview,Genres,PrimaryImageAspectRatio"
     ): Response<ItemsResponse>
 
     @POST("UserFavoriteItems/{itemId}")
@@ -119,21 +124,21 @@ interface JellyfinApi {
         @Path("itemId") itemId: String,
         @Query("userId") userId: String,
         @Query("limit") limit: Int = 12,
-        @Query("fields") fields: String = "Overview,Genres,OfficialRating,CommunityRating,RunTimeTicks,PrimaryImageAspectRatio"
+        @Query("fields") fields: String = "Overview,Genres,PrimaryImageAspectRatio"
     ): Response<ItemsResponse>
 
-    @POST("Users/{userId}/PlayedItems/{itemId}")
+    @POST("UserPlayedItems/{itemId}")
     suspend fun markPlayed(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
-        @Path("itemId") itemId: String
+        @Path("itemId") itemId: String,
+        @Query("userId") userId: String
     ): Response<UserData>
 
-    @DELETE("Users/{userId}/PlayedItems/{itemId}")
+    @DELETE("UserPlayedItems/{itemId}")
     suspend fun unmarkPlayed(
         @Header("Authorization") authHeader: String,
-        @Path("userId") userId: String,
-        @Path("itemId") itemId: String
+        @Path("itemId") itemId: String,
+        @Query("userId") userId: String
     ): Response<UserData>
 
     @POST("Sessions/Playing")

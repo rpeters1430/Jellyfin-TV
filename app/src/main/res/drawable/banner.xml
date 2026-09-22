@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV home-screen launcher banner (16:9, 320x180dp). Placeholder artwork: replace with
+     a designed banner that includes the app name when one exists. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#0B1220"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#AA5CC3"
+        android:pathData="M120,50 L200,90 L120,130 z" />
+    <path
+        android:fillColor="#00A4DC"
+        android:pathData="M132,62 L182,90 L132,118 z" />
+</vector>

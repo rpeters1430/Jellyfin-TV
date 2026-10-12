@@ -77,8 +77,9 @@ class LibraryViewModel(
                     "tvshows" -> "Series"
                     "playlists" -> "Playlist"
                     "music" -> "MusicAlbum,Audio"
-                    "homevideos", "photos" -> "Video,Photo"
-                    else -> "Movie,Series,MusicAlbum,Video,Playlist"
+                    "homevideos" -> "Video"
+                    "photos" -> "Photo"
+                    else -> "Movie,Series,MusicAlbum,Video,Photo,Playlist"
                 }
                 repository.getLibraryItems(includeItemTypes = types, sortBy = sort.sortBy, sortOrder = sort.sortOrder)
             }

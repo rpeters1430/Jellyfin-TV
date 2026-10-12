@@ -51,6 +51,23 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.onScreenResumed()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.onScreenResumed()
+    }
+
     LaunchedEffect(state.sessionExpired) {
         if (state.sessionExpired) onLogout()
     }
@@ -163,7 +180,13 @@ fun HomeScreen(
                 HeroBanner(
                     item = focusedItem,
                     backdropUrl = focusedBackdrop,
-                    onPlayClick = { media -> onPlayMedia(media) },
+                    onPlayClick = { media ->
+                        if (media.type == "Photo") {
+                            onMediaSelected(media)
+                        } else {
+                            onPlayMedia(media)
+                        }
+                    },
                     onDetailsClick = { media -> onMediaSelected(media) },
                     backdropHeaders = imageHeaders
                 )
@@ -310,7 +333,7 @@ fun HomeScreen(
                         items = section.items,
                         getPosterUrl = { id -> viewModel.getPosterUrl(id) },
                         onItemClick = { media ->
-                            if (media.type == "Movie" || media.type == "Episode" || media.type == "Video" || media.type == "Photo") {
+                            if (media.type == "Movie" || media.type == "Episode" || media.type == "Video") {
                                 onPlayMedia(media)
                             } else {
                                 onMediaSelected(media)

@@ -16,18 +16,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+import com.example.jellyfintv.data.model.MediaUpdateEvent
+import kotlinx.coroutines.flow.MutableSharedFlow
+
 class HomeViewModelTest {
 
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var repository: JellyfinRepository
+    private lateinit var mediaEventsFlow: MutableSharedFlow<MediaUpdateEvent>
 
     private fun movie(id: String) = MediaItem(id = id, name = "Movie $id")
 
     @org.junit.Before
     fun setup() {
         repository = mockk(relaxed = true)
+        mediaEventsFlow = MutableSharedFlow()
+        every { repository.mediaEvents } returns mediaEventsFlow
         coEvery { repository.getUserViews() } returns Result.success(emptyList())
         coEvery { repository.getLatestItemsByParent(any()) } returns Result.success(emptyList())
         coEvery { repository.getItemsByParent(any(), any(), any(), any()) } returns Result.success(emptyList())
@@ -175,6 +181,96 @@ class HomeViewModelTest {
             assertEquals("Stuff", state.librarySections.first().title)
             assertEquals(listOf(stuffItem), state.librarySections.first().items)
             assertEquals(stuffItem, state.focusedItem)
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun `media event triggers silent refresh and preserves focused item`() = runTest {
+        val initialResume = listOf(movie("r1"))
+        coEvery { repository.getResumeItems() } returns Result.success(initialResume)
+        coEvery { repository.getNextUpItems() } returns Result.success(emptyList())
+        coEvery { repository.getLatestMovies() } returns Result.success(listOf(movie("m1")))
+        coEvery { repository.getLatestSeries() } returns Result.success(emptyList())
+
+        val viewModel = HomeViewModel(repository)
+
+        viewModel.onItemFocused(movie("m1"))
+
+        val updatedResume = listOf(movie("r1"), movie("r2"))
+        coEvery { repository.getResumeItems() } returns Result.success(updatedResume)
+
+        mediaEventsFlow.emit(MediaUpdateEvent.PlaybackStopped("r2"))
+        testScheduler.advanceTimeBy(1000L)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertFalse(state.isLoading)
+            assertEquals(updatedResume, state.resumeItems)
+            assertEquals(movie("m1"), state.focusedItem)
+        }
+    }
+
+    @Test
+    fun `refresh with silent=true does not reset isLoading to true`() = runTest {
+        coEvery { repository.getResumeItems() } returns Result.success(listOf(movie("r1")))
+        coEvery { repository.getNextUpItems() } returns Result.success(emptyList())
+        coEvery { repository.getLatestMovies() } returns Result.success(emptyList())
+        coEvery { repository.getLatestSeries() } returns Result.success(emptyList())
+
+        val viewModel = HomeViewModel(repository)
+        viewModel.refresh(silent = true)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertFalse(state.isLoading)
+            assertEquals(listOf(movie("r1")), state.resumeItems)
+        }
+    }
+
+    @Test
+    fun `multiple libraries of the same category appear as distinct sections with their own names`() = runTest {
+        val moviesView = MediaItem(id = "view-movies", name = "Movies", type = "CollectionFolder", collectionType = "movies")
+        val kidsMoviesView = MediaItem(id = "view-kids-movies", name = "Kids Movies", type = "CollectionFolder", collectionType = "movies")
+        val familyVideosView = MediaItem(id = "view-family-videos", name = "Family Videos", type = "CollectionFolder", collectionType = "homevideos")
+        val droneFootageView = MediaItem(id = "view-drone-footage", name = "Drone Footage", type = "CollectionFolder", collectionType = "homevideos")
+        val vacationPhotosView = MediaItem(id = "view-vacation-photos", name = "Vacation Photos", type = "CollectionFolder", collectionType = "photos")
+
+        val kidsMovieItem = MediaItem(id = "km1", name = "Toy Story", type = "Movie")
+        val familyVideoItem = MediaItem(id = "fv1", name = "Beach Trip", type = "Video")
+        val droneItem = MediaItem(id = "df1", name = "Mountain Flyover", type = "Video")
+        val photoItem = MediaItem(id = "vp1", name = "Sunset", type = "Photo")
+
+        coEvery { repository.getResumeItems() } returns Result.success(emptyList())
+        coEvery { repository.getNextUpItems() } returns Result.success(emptyList())
+        coEvery { repository.getLatestMovies() } returns Result.success(listOf(movie("m1")))
+        coEvery { repository.getLatestSeries() } returns Result.success(emptyList())
+
+        coEvery { repository.getUserViews() } returns Result.success(
+            listOf(moviesView, kidsMoviesView, familyVideosView, droneFootageView, vacationPhotosView)
+        )
+        coEvery { repository.getLatestItemsByParent("view-kids-movies") } returns Result.success(listOf(kidsMovieItem))
+        coEvery { repository.getLatestItemsByParent("view-family-videos") } returns Result.success(listOf(familyVideoItem))
+        coEvery { repository.getLatestItemsByParent("view-drone-footage") } returns Result.success(listOf(droneItem))
+        coEvery { repository.getLatestItemsByParent("view-vacation-photos") } returns Result.success(listOf(photoItem))
+
+        val viewModel = HomeViewModel(repository)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            // Primary movies view is covered by latestMovies, so librarySections has the other 4
+            assertEquals(4, state.librarySections.size)
+            assertEquals("Kids Movies", state.librarySections[0].title)
+            assertEquals(listOf(kidsMovieItem), state.librarySections[0].items)
+
+            assertEquals("Family Videos", state.librarySections[1].title)
+            assertEquals(listOf(familyVideoItem), state.librarySections[1].items)
+
+            assertEquals("Drone Footage", state.librarySections[2].title)
+            assertEquals(listOf(droneItem), state.librarySections[2].items)
+
+            assertEquals("Vacation Photos", state.librarySections[3].title)
+            assertEquals(listOf(photoItem), state.librarySections[3].items)
         }
     }
 }

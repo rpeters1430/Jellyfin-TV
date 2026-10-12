@@ -7,6 +7,8 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -31,11 +33,13 @@ fun getLibraryIcon(collectionType: String?, name: String): ImageVector {
     val type = collectionType?.lowercase() ?: ""
     val lowerName = name.lowercase()
     return when {
-        type == "movies" || lowerName.contains("movie") || lowerName.contains("film") -> Icons.Default.Movie
+        lowerName.contains("drone") -> Icons.Default.Flight
+        type == "photos" || lowerName.contains("photo") || lowerName.contains("wallpaper") || lowerName.contains("picture") -> Icons.Default.PhotoLibrary
+        type == "homevideos" || lowerName.contains("video") || lowerName.contains("home video") || lowerName.contains("family video") -> Icons.Default.Videocam
+        type == "movies" || lowerName.contains("movie") || lowerName.contains("film") || lowerName.contains("cinema") -> Icons.Default.Movie
         type == "tvshows" || lowerName.contains("tv") || lowerName.contains("series") || lowerName.contains("show") || lowerName.contains("anime") -> Icons.Default.Tv
         type == "playlists" || type == "playlist" || lowerName.contains("playlist") || lowerName.contains("youtube") -> Icons.AutoMirrored.Filled.PlaylistPlay
         type == "music" || lowerName.contains("music") || lowerName.contains("song") || lowerName.contains("audio") -> Icons.Default.MusicNote
-        type == "homevideos" || type == "photos" || lowerName.contains("video") || lowerName.contains("photo") || lowerName.contains("stuff") -> Icons.Default.PhotoLibrary
         type == "boxsets" || lowerName.contains("collection") -> Icons.Default.VideoLibrary
         type == "audiobooks" || lowerName.contains("book") -> Icons.AutoMirrored.Filled.MenuBook
         else -> Icons.Default.Folder
@@ -101,29 +105,36 @@ fun AppNavHeader(
             }
         }
 
-        // Center: Dynamic Navigation Tabs
-        Row(
+        // Center: Dynamic Navigation Tabs in scrollable LazyRow
+        LazyRow(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Home Tab
-            NavTabButton(
-                title = "Home",
-                icon = Icons.Default.Home,
-                isSelected = currentTabId == "home",
-                onClick = onNavigateHome
-            )
+            item(key = "nav-home") {
+                NavTabButton(
+                    title = "Home",
+                    icon = Icons.Default.Home,
+                    isSelected = currentTabId == "home",
+                    onClick = onNavigateHome
+                )
+            }
 
             // Search Tab
-            NavTabButton(
-                title = "Search",
-                icon = Icons.Default.Search,
-                isSelected = currentTabId == "search",
-                onClick = onNavigateSearch
-            )
+            item(key = "nav-search") {
+                NavTabButton(
+                    title = "Search",
+                    icon = Icons.Default.Search,
+                    isSelected = currentTabId == "search",
+                    onClick = onNavigateSearch
+                )
+            }
 
-            // Dynamic User Libraries (Movies, TV Shows, Music, Stuff, etc.)
-            libraries.forEach { lib ->
+            // Dynamic User Libraries (Movies, Kids Movies, Anime, Family Videos, Drone Footage, Vacation Photos, etc.)
+            items(libraries, key = { "nav-lib-${it.id}" }) { lib ->
                 NavTabButton(
                     title = lib.name,
                     icon = getLibraryIcon(lib.collectionType, lib.name),

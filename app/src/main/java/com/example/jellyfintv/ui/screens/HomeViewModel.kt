@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.jellyfintv.data.model.MediaItem
 import com.example.jellyfintv.data.repository.JellyfinRepository
 import com.example.jellyfintv.data.repository.UnauthorizedException
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -42,12 +44,34 @@ class HomeViewModel(private val repository: JellyfinRepository) : ViewModel() {
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     val isDemoMode: Boolean get() = repository.isDemoMode
+    private var lastRefreshTimestamp: Long = 0L
 
     init {
-        load()
+        load(silent = false)
+        observeMediaEvents()
     }
 
-    fun retry() = load()
+    @OptIn(FlowPreview::class)
+    private fun observeMediaEvents() {
+        viewModelScope.launch {
+            repository.mediaEvents
+                .debounce(800L)
+                .collect {
+                    refresh(silent = true)
+                }
+        }
+    }
+
+    fun retry() = load(silent = false)
+
+    fun refresh(silent: Boolean = true) = load(silent = silent)
+
+    fun onScreenResumed() {
+        val now = System.currentTimeMillis()
+        if (now - lastRefreshTimestamp >= 15_000L) {
+            refresh(silent = true)
+        }
+    }
 
     fun onItemFocused(media: MediaItem) {
         _uiState.update { it.copy(focusedItem = media) }
@@ -57,9 +81,13 @@ class HomeViewModel(private val repository: JellyfinRepository) : ViewModel() {
     fun getBackdropUrl(itemId: String): String = repository.getBackdropUrl(itemId)
     fun getImageHeaders(): Map<String, String> = repository.getStreamHeaders()
 
-    private fun load() {
+    private fun load(silent: Boolean = false) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, errorMessage = null, sessionExpired = false) }
+            if (!silent) {
+                _uiState.update { it.copy(isLoading = true, errorMessage = null, sessionExpired = false) }
+            } else {
+                _uiState.update { it.copy(errorMessage = null, sessionExpired = false) }
+            }
 
             var unauthorizedCount = 0
             var errorMessage: String? = null
@@ -89,10 +117,16 @@ class HomeViewModel(private val repository: JellyfinRepository) : ViewModel() {
             val viewsResult = repository.getUserViews()
             viewsResult.onSuccess { views ->
                 userLibraries = views
+                val firstMovieViewId = views.firstOrNull { it.collectionType?.lowercase() == "movies" }?.id
+                val firstTvViewId = views.firstOrNull { it.collectionType?.lowercase() == "tvshows" }?.id
+
                 for (view in views) {
-                    val type = view.collectionType?.lowercase()
-                    // If it's a dedicated custom library (like music, homevideos, photos, mixed, or other custom folders)
-                    if (type != "movies" && type != "tvshows") {
+                    val isPrimaryMovie = (view.id == firstMovieViewId)
+                    val isPrimaryTv = (view.id == firstTvViewId)
+
+                    // Secondary movie/TV libraries, or any other library categories (homevideos, photos, music, etc.)
+                    // get their own dedicated section on the home screen
+                    if (!isPrimaryMovie && !isPrimaryTv) {
                         val itemsResult = repository.getLatestItemsByParent(view.id)
                         val items = itemsResult.getOrNull()?.ifEmpty {
                             repository.getItemsByParent(view.id).getOrDefault(emptyList())
@@ -125,13 +159,18 @@ class HomeViewModel(private val repository: JellyfinRepository) : ViewModel() {
                 return@launch
             }
 
-            val initialFocus = resumeItems.firstOrNull()
-                ?: latestMovies.firstOrNull()
-                ?: latestSeries.firstOrNull()
-                ?: librarySections.firstOrNull()?.items?.firstOrNull()
+            lastRefreshTimestamp = System.currentTimeMillis()
 
-            _uiState.update {
-                it.copy(
+            _uiState.update { current ->
+                val allNewItems = resumeItems + nextUpItems + latestMovies + latestSeries + librarySections.flatMap { it.items }
+                val updatedFocus = current.focusedItem?.let { curr ->
+                    allNewItems.find { it.id == curr.id } ?: curr
+                } ?: (resumeItems.firstOrNull()
+                    ?: latestMovies.firstOrNull()
+                    ?: latestSeries.firstOrNull()
+                    ?: librarySections.firstOrNull()?.items?.firstOrNull())
+
+                current.copy(
                     isLoading = false,
                     resumeItems = resumeItems,
                     nextUpItems = nextUpItems,
@@ -139,11 +178,10 @@ class HomeViewModel(private val repository: JellyfinRepository) : ViewModel() {
                     latestSeries = latestSeries,
                     librarySections = librarySections,
                     userLibraries = userLibraries,
-                    focusedItem = initialFocus,
+                    focusedItem = updatedFocus,
                     errorMessage = errorMessage
                 )
             }
         }
     }
 }
-

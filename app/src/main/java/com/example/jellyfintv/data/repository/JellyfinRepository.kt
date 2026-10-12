@@ -1,9 +1,13 @@
 package com.example.jellyfintv.data.repository
 
+import com.example.jellyfintv.data.api.JellyfinWebSocketManager
 import com.example.jellyfintv.data.api.RetrofitClient
 import com.example.jellyfintv.data.model.*
 import com.example.jellyfintv.data.preferences.ServerPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.withContext
 import retrofit2.Response
 import java.util.UUID
@@ -12,8 +16,35 @@ class UnauthorizedException(message: String = "Session expired, please sign in a
 
 class JellyfinRepository(val prefs: ServerPreferences) {
 
-    private val deviceId: String by lazy {
-        UUID.nameUUIDFromBytes("JellyfinTVApp".toByteArray()).toString()
+    private val deviceId: String = UUID.nameUUIDFromBytes("JellyfinTVApp".toByteArray()).toString()
+
+    private val _mediaEvents = MutableSharedFlow<MediaUpdateEvent>(
+        replay = 0,
+        extraBufferCapacity = 64
+    )
+    val mediaEvents: SharedFlow<MediaUpdateEvent> = _mediaEvents.asSharedFlow()
+
+    private var socketManager: JellyfinWebSocketManager? = null
+
+    fun notifyMediaEvent(event: MediaUpdateEvent) {
+        _mediaEvents.tryEmit(event)
+    }
+
+    fun connectWebSocket() {
+        if (!isDemoMode && prefs.isLoggedIn) {
+            if (socketManager == null) {
+                val okHttpClient = RetrofitClient.buildOkHttpClient(prefs.trustSelfSignedCerts)
+                socketManager = JellyfinWebSocketManager(okHttpClient) { event ->
+                    notifyMediaEvent(event)
+                }
+            }
+            socketManager?.start(prefs.serverUrl, prefs.token, deviceId)
+        }
+    }
+
+    fun disconnectWebSocket() {
+        socketManager?.stop()
+        socketManager = null
     }
 
     private fun getAuthHeader(): String {
@@ -89,6 +120,8 @@ class JellyfinRepository(val prefs: ServerPreferences) {
                     prefs.token = authResult.accessToken ?: ""
                     prefs.userId = authResult.user?.id ?: ""
                     prefs.username = authResult.user?.name ?: username
+                    connectWebSocket()
+                    notifyMediaEvent(MediaUpdateEvent.RefreshRequested)
                     return@withContext Result.success(authResult)
                 } else if (response.code() == 401) {
                     return@withContext Result.failure(Exception("Invalid username or password (401 Unauthorized)"))
@@ -105,6 +138,7 @@ class JellyfinRepository(val prefs: ServerPreferences) {
     }
 
     fun logout() {
+        disconnectWebSocket()
         prefs.clear()
     }
 
@@ -130,6 +164,16 @@ class JellyfinRepository(val prefs: ServerPreferences) {
                 "mock-music-2" -> "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80"
                 "mock-video-1" -> "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&auto=format&fit=crop&q=80"
                 "mock-video-2" -> "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&auto=format&fit=crop&q=80"
+                "mock-drone-1" -> "https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=600&auto=format&fit=crop&q=80"
+                "mock-drone-2" -> "https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=600&auto=format&fit=crop&q=80"
+                "mock-photo-1" -> "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=600&auto=format&fit=crop&q=80"
+                "mock-photo-2" -> "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&auto=format&fit=crop&q=80"
+                "mock-photo-3" -> "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=600&auto=format&fit=crop&q=80"
+                "mock-photo-4" -> "https://images.unsplash.com/photo-1448375240586-882707db888b?w=600&auto=format&fit=crop&q=80"
+                "mock-kids-1" -> "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&auto=format&fit=crop&q=80"
+                "mock-kids-2" -> "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80"
+                "mock-anime-1" -> "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80"
+                "mock-anime-2" -> "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80"
                 "mock-playlist-1", "mock-pl-item-101", "mock-pl-item-102", "mock-pl-item-103", "mock-pl-item-104" -> "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80"
                 "mock-playlist-2", "mock-pl-item-201", "mock-pl-item-202", "mock-pl-item-203" -> "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80"
                 "mock-playlist-3", "mock-pl-item-301", "mock-pl-item-302", "mock-pl-item-303" -> "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=600&auto=format&fit=crop&q=80"
@@ -160,6 +204,16 @@ class JellyfinRepository(val prefs: ServerPreferences) {
                 "mock-music-2" -> "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1920&auto=format&fit=crop&q=80"
                 "mock-video-1" -> "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1920&auto=format&fit=crop&q=80"
                 "mock-video-2" -> "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1920&auto=format&fit=crop&q=80"
+                "mock-drone-1" -> "https://images.unsplash.com/photo-1508614589041-895b88991e3e?w=1920&auto=format&fit=crop&q=80"
+                "mock-drone-2" -> "https://images.unsplash.com/photo-1527977966376-1c8408f9f108?w=1920&auto=format&fit=crop&q=80"
+                "mock-photo-1" -> "https://images.unsplash.com/photo-1533105079780-92b9be482077?w=1920&auto=format&fit=crop&q=80"
+                "mock-photo-2" -> "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1920&auto=format&fit=crop&q=80"
+                "mock-photo-3" -> "https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?w=1920&auto=format&fit=crop&q=80"
+                "mock-photo-4" -> "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&auto=format&fit=crop&q=80"
+                "mock-kids-1" -> "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=1920&auto=format&fit=crop&q=80"
+                "mock-kids-2" -> "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1920&auto=format&fit=crop&q=80"
+                "mock-anime-1" -> "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1920&auto=format&fit=crop&q=80"
+                "mock-anime-2" -> "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1920&auto=format&fit=crop&q=80"
                 "mock-playlist-1", "mock-pl-item-101", "mock-pl-item-102", "mock-pl-item-103", "mock-pl-item-104" -> "https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=1920&auto=format&fit=crop&q=80"
                 "mock-playlist-2", "mock-pl-item-201", "mock-pl-item-202", "mock-pl-item-203" -> "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920&auto=format&fit=crop&q=80"
                 "mock-playlist-3", "mock-pl-item-301", "mock-pl-item-302", "mock-pl-item-303" -> "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1920&auto=format&fit=crop&q=80"
@@ -286,10 +340,15 @@ class JellyfinRepository(val prefs: ServerPreferences) {
             return@withContext Result.success(
                 listOf(
                     MediaItem(id = "view-movies", name = "Movies", type = "CollectionFolder", collectionType = "movies"),
+                    MediaItem(id = "view-kids-movies", name = "Kids Movies", type = "CollectionFolder", collectionType = "movies"),
                     MediaItem(id = "view-series", name = "TV Shows", type = "CollectionFolder", collectionType = "tvshows"),
+                    MediaItem(id = "view-anime", name = "Anime", type = "CollectionFolder", collectionType = "tvshows"),
+                    MediaItem(id = "view-home-videos", name = "Family Videos", type = "CollectionFolder", collectionType = "homevideos"),
+                    MediaItem(id = "view-drone-videos", name = "Drone Footage", type = "CollectionFolder", collectionType = "homevideos"),
+                    MediaItem(id = "view-vacation-photos", name = "Vacation Photos", type = "CollectionFolder", collectionType = "photos"),
+                    MediaItem(id = "view-nature-photos", name = "Nature Wallpapers", type = "CollectionFolder", collectionType = "photos"),
                     MediaItem(id = "view-playlists", name = "Playlists", type = "CollectionFolder", collectionType = "playlists"),
-                    MediaItem(id = "view-music", name = "Music", type = "CollectionFolder", collectionType = "music"),
-                    MediaItem(id = "view-stuff", name = "Stuff (Home Videos & Photos)", type = "CollectionFolder", collectionType = "homevideos")
+                    MediaItem(id = "view-music", name = "Music", type = "CollectionFolder", collectionType = "music")
                 )
             )
         }
@@ -306,9 +365,14 @@ class JellyfinRepository(val prefs: ServerPreferences) {
     suspend fun getLatestItemsByParent(parentId: String): Result<List<MediaItem>> = withContext(Dispatchers.IO) {
         if (isDemoMode) {
             val items = when (parentId) {
+                "view-kids-movies" -> SampleMediaData.sampleKidsMovies
+                "view-anime" -> SampleMediaData.sampleAnime
+                "view-home-videos", "view-stuff" -> SampleMediaData.sampleHomeVideos
+                "view-drone-videos" -> SampleMediaData.sampleDroneVideos
+                "view-vacation-photos" -> SampleMediaData.sampleVacationPhotos
+                "view-nature-photos" -> SampleMediaData.sampleNaturePhotos
                 "view-playlists" -> SampleMediaData.samplePlaylists
                 "view-music" -> SampleMediaData.sampleMusic
-                "view-stuff" -> SampleMediaData.sampleHomeVideos
                 "view-series" -> SampleMediaData.sampleSeries
                 else -> SampleMediaData.sampleMovies
             }
@@ -331,9 +395,14 @@ class JellyfinRepository(val prefs: ServerPreferences) {
     ): Result<List<MediaItem>> = withContext(Dispatchers.IO) {
         if (isDemoMode) {
             val items = when (parentId) {
+                "view-kids-movies" -> SampleMediaData.sampleKidsMovies
+                "view-anime" -> SampleMediaData.sampleAnime
+                "view-home-videos", "view-stuff" -> SampleMediaData.sampleHomeVideos
+                "view-drone-videos" -> SampleMediaData.sampleDroneVideos
+                "view-vacation-photos" -> SampleMediaData.sampleVacationPhotos
+                "view-nature-photos" -> SampleMediaData.sampleNaturePhotos
                 "view-playlists" -> SampleMediaData.samplePlaylists
                 "view-music" -> SampleMediaData.sampleMusic
-                "view-stuff" -> SampleMediaData.sampleHomeVideos
                 "view-series" -> SampleMediaData.sampleSeries
                 else -> SampleMediaData.sampleMovies
             }
@@ -361,7 +430,10 @@ class JellyfinRepository(val prefs: ServerPreferences) {
                 SampleMediaData.sampleSeasons.values.flatten() +
                 SampleMediaData.sampleEpisodes.values.flatten() +
                 SampleMediaData.samplePlaylists + SampleMediaData.samplePlaylistItems.values.flatten() +
-                SampleMediaData.sampleMusic + SampleMediaData.sampleHomeVideos
+                SampleMediaData.sampleMusic + SampleMediaData.sampleHomeVideos +
+                SampleMediaData.sampleDroneVideos + SampleMediaData.sampleVacationPhotos +
+                SampleMediaData.sampleNaturePhotos + SampleMediaData.sampleKidsMovies +
+                SampleMediaData.sampleAnime
             val item = allMock.find { it.id == itemId } ?: SampleMediaData.sampleMovies.first()
             return@withContext Result.success(item)
         }
@@ -459,7 +531,12 @@ class JellyfinRepository(val prefs: ServerPreferences) {
                 SampleMediaData.samplePlaylists +
                 SampleMediaData.samplePlaylistItems.values.flatten() +
                 SampleMediaData.sampleMusic +
-                SampleMediaData.sampleHomeVideos
+                SampleMediaData.sampleHomeVideos +
+                SampleMediaData.sampleDroneVideos +
+                SampleMediaData.sampleVacationPhotos +
+                SampleMediaData.sampleNaturePhotos +
+                SampleMediaData.sampleKidsMovies +
+                SampleMediaData.sampleAnime
             val filtered = allMock.filter {
                 it.name.contains(cleanQuery, ignoreCase = true) ||
                 (it.overview?.contains(cleanQuery, ignoreCase = true) == true) ||
@@ -481,6 +558,7 @@ class JellyfinRepository(val prefs: ServerPreferences) {
     }
 
     suspend fun toggleFavorite(itemId: String, isFavorite: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
+        notifyMediaEvent(MediaUpdateEvent.UserDataChanged(userId = prefs.userId, itemIds = listOf(itemId)))
         if (isDemoMode) return@withContext Result.success(!isFavorite)
         try {
             val api = api()
@@ -519,6 +597,7 @@ class JellyfinRepository(val prefs: ServerPreferences) {
     }
 
     suspend fun togglePlayed(itemId: String, currentlyPlayed: Boolean): Result<UserData> = withContext(Dispatchers.IO) {
+        notifyMediaEvent(MediaUpdateEvent.UserDataChanged(userId = prefs.userId, itemIds = listOf(itemId)))
         if (isDemoMode) {
             return@withContext Result.success(
                 UserData(
@@ -578,6 +657,7 @@ class JellyfinRepository(val prefs: ServerPreferences) {
     }
 
     suspend fun reportPlayingStopped(itemId: String, positionTicks: Long) = withContext(Dispatchers.IO) {
+        notifyMediaEvent(MediaUpdateEvent.PlaybackStopped(itemId))
         if (isDemoMode) return@withContext
         try {
             val api = api()

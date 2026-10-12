@@ -742,12 +742,125 @@ object SampleMediaData {
         ),
         MediaItem(
             id = "mock-video-2",
+            name = "Family Road Trip",
+            overview = "Scenic coastal highway drive, camping, and beach campfire clips.",
+            type = "Video",
+            productionYear = 2024,
+            runTimeTicks = 1_200_000_000L, // 20 min
+            genres = listOf("Home Video", "Travel")
+        )
+    )
+
+    val sampleDroneVideos = listOf(
+        MediaItem(
+            id = "mock-drone-1",
             name = "Drone Flight over Alps",
             overview = "Aerial 4K landscape capture of snow peaks and alpine lakes.",
             type = "Video",
             productionYear = 2024,
             runTimeTicks = 900_000_000L, // 15 min
-            genres = listOf("Travel", "Drone")
+            genres = listOf("Drone", "4K", "Aerial")
+        ),
+        MediaItem(
+            id = "mock-drone-2",
+            name = "Coastal Cliffs FPV",
+            overview = "Fast-paced acrobatic FPV drone flight through sea caves and ocean cliffs.",
+            type = "Video",
+            productionYear = 2025,
+            runTimeTicks = 600_000_000L, // 10 min
+            genres = listOf("Drone", "FPV", "Action")
+        )
+    )
+
+    val sampleVacationPhotos = listOf(
+        MediaItem(
+            id = "mock-photo-1",
+            name = "Sunset Over Amalfi Coast",
+            overview = "High-resolution landscape capture of golden hour over coastal cliffs.",
+            type = "Photo",
+            productionYear = 2024,
+            genres = listOf("Photography", "Travel")
+        ),
+        MediaItem(
+            id = "mock-photo-2",
+            name = "Alpine Lake Trail Sunrise",
+            overview = "Crystal clear reflections across mountain waters at dawn.",
+            type = "Photo",
+            productionYear = 2024,
+            genres = listOf("Photography", "Nature")
+        )
+    )
+
+    val sampleNaturePhotos = listOf(
+        MediaItem(
+            id = "mock-photo-3",
+            name = "Aurora Borealis Fjords",
+            overview = "Night sky auroral display over snowy Scandinavian fjords.",
+            type = "Photo",
+            productionYear = 2025,
+            genres = listOf("Photography", "Aurora")
+        ),
+        MediaItem(
+            id = "mock-photo-4",
+            name = "Golden Forest Canopy",
+            overview = "Sunbeams streaming through autumn redwood trees.",
+            type = "Photo",
+            productionYear = 2024,
+            genres = listOf("Photography", "Forest")
+        )
+    )
+
+    val sampleKidsMovies = listOf(
+        MediaItem(
+            id = "mock-kids-1",
+            name = "Robot Odyssey",
+            taglines = listOf("Big hearts come in all shapes and sizes."),
+            overview = "A curious young inventor robot embarks on a whimsical journey across a mechanical wonderland to find the legendary lost battery.",
+            type = "Movie",
+            productionYear = 2024,
+            officialRating = "G",
+            communityRating = 8.7f,
+            genres = listOf("Animation", "Family", "Adventure"),
+            runTimeTicks = 5_400_000_000L
+        ),
+        MediaItem(
+            id = "mock-kids-2",
+            name = "Secret of the Forest Spirits",
+            taglines = listOf("Believe in the magic all around you."),
+            overview = "Two siblings discover an enchanted woodland realm guarded by benevolent mythical creatures.",
+            type = "Movie",
+            productionYear = 2025,
+            officialRating = "PG",
+            communityRating = 8.9f,
+            genres = listOf("Animation", "Family", "Fantasy"),
+            runTimeTicks = 5_800_000_000L
+        )
+    )
+
+    val sampleAnime = listOf(
+        MediaItem(
+            id = "mock-anime-1",
+            name = "Cyber Blade: Neo Tokyo",
+            taglines = listOf("Steel in the shadows."),
+            overview = "In the mega-city of Neo Tokyo, a cybernetically enhanced samurai protects the forgotten citizens from corrupt megacorporations.",
+            type = "Series",
+            status = "Continuing",
+            productionYear = 2024,
+            officialRating = "TV-14",
+            communityRating = 9.1f,
+            genres = listOf("Anime", "Action", "Cyberpunk")
+        ),
+        MediaItem(
+            id = "mock-anime-2",
+            name = "Starlight Alchemist",
+            taglines = listOf("Transmute the stars."),
+            overview = "Apprentice alchemists harness celestial energy to defend their floating academy from ancient cosmic monsters.",
+            type = "Series",
+            status = "Continuing",
+            productionYear = 2025,
+            officialRating = "TV-PG",
+            communityRating = 8.8f,
+            genres = listOf("Anime", "Fantasy", "Adventure")
         )
     )
 

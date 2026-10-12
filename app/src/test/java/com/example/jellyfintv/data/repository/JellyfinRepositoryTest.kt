@@ -1,8 +1,10 @@
 package com.example.jellyfintv.data.repository
 
+import app.cash.turbine.test
 import com.example.jellyfintv.data.model.AuthResult
 import com.example.jellyfintv.data.model.ItemsResponse
 import com.example.jellyfintv.data.model.MediaItem
+import com.example.jellyfintv.data.model.MediaUpdateEvent
 import com.example.jellyfintv.data.model.UserInfo
 import com.example.jellyfintv.data.preferences.FakeServerPreferences
 import com.google.gson.Gson
@@ -367,5 +369,26 @@ class JellyfinRepositoryTest {
 
         assertFalse(prefs.isLoggedIn)
         assertEquals("", prefs.token)
+    }
+
+    @Test
+    fun `reportPlayingStopped emits PlaybackStopped event`() = runTest {
+        repository.mediaEvents.test {
+            repository.reportPlayingStopped("item-123", 5000L)
+            val event = awaitItem()
+            assertTrue(event is MediaUpdateEvent.PlaybackStopped)
+            assertEquals("item-123", (event as MediaUpdateEvent.PlaybackStopped).itemId)
+        }
+    }
+
+    @Test
+    fun `togglePlayed emits UserDataChanged event`() = runTest {
+        prefs.userId = "user-1"
+        repository.mediaEvents.test {
+            repository.togglePlayed("item-456", currentlyPlayed = false)
+            val event = awaitItem()
+            assertTrue(event is MediaUpdateEvent.UserDataChanged)
+            assertEquals(listOf("item-456"), (event as MediaUpdateEvent.UserDataChanged).itemIds)
+        }
     }
 }

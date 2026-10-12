@@ -50,6 +50,12 @@ class MainActivity : ComponentActivity() {
             var showThemeDialog by remember { mutableStateOf(false) }
 
             JellyfinTVTheme(preset = currentTheme) {
+                LaunchedEffect(prefs.isLoggedIn) {
+                    if (prefs.isLoggedIn) {
+                        repository.connectWebSocket()
+                    }
+                }
+
                 var currentScreen by remember {
                     mutableStateOf<Screen>(if (prefs.isLoggedIn) Screen.Home else Screen.Connect)
                 }

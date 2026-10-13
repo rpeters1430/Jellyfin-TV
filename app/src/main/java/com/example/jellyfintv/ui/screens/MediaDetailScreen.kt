@@ -1004,8 +1004,8 @@ private fun EpisodeCard(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isHighlighted = isFocused || isHovered
     val scale by animateFloatAsState(targetValue = if (isHighlighted) 1.06f else 1.0f, label = "episodeScale")
-    val isWatched = episode.userData?.played == true
-    val progress = episode.userData?.playedPercentage ?: 0f
+    val isWatched = episode.isPlayed
+    val progress = episode.playbackProgress
 
     Column(
         modifier = Modifier
@@ -1803,8 +1803,8 @@ private fun PlaylistItemCard(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isHighlighted = isFocused || isHovered
     val scale by animateFloatAsState(targetValue = if (isHighlighted) 1.05f else 1.0f, label = "playlistItemScale")
-    val isWatched = item.userData?.played == true
-    val progress = item.userData?.playedPercentage ?: 0f
+    val isWatched = item.isPlayed
+    val progress = item.playbackProgress
 
     Column(
         modifier = Modifier

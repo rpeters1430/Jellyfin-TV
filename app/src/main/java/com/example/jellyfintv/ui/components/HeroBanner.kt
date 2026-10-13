@@ -12,6 +12,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -183,6 +184,48 @@ fun HeroBanner(
                                 text = item.officialRating,
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = TextSecondary,
+                                    fontSize = 10.sp
+                                )
+                            )
+                        }
+                    }
+
+                    if (item.isPlayed) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF10B981).copy(alpha = 0.2f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Watched",
+                                tint = Color(0xFF10B981),
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "Watched",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = Color(0xFF10B981),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            )
+                        }
+                    } else if (item.playbackProgress > 0f) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(JellyfinBlue.copy(alpha = 0.2f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${item.playbackProgress.toInt()}% watched",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    color = JellyfinBlue,
+                                    fontWeight = FontWeight.Bold,
                                     fontSize = 10.sp
                                 )
                             )

@@ -8,8 +8,11 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,6 +56,11 @@ fun MediaCard(
         targetValue = if (isHighlighted) 1.08f else 1.0f,
         label = "cardScale"
     )
+
+    val isWatched = item.isPlayed
+    val progress = item.playbackProgress
+    val isFavorite = item.isFavorite
+    val unplayedCount = item.unplayedCount
 
     Box(
         modifier = modifier
@@ -116,19 +124,77 @@ fun MediaCard(
                 )
         )
 
-        // Progress Bar overlay for resume items
-        if (item.playedPercentage > 0f) {
+        // Play status badges at Top-Right (Watched checkmark or Unplayed count)
+        if (isWatched) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF10B981).copy(alpha = 0.95f))
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Watched",
+                    tint = Color.White,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+        } else if (unplayedCount != null && unplayedCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(CardSurfaceVariant.copy(alpha = 0.9f))
+                    .border(1.dp, JellyfinBlue.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$unplayedCount",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                )
+            }
+        }
+
+        // Favorite indicator at Top-Left
+        if (isFavorite) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .padding(4.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "Favorite",
+                    tint = Color(0xFFF43F5E),
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+        }
+
+        // Progress Bar overlay at bottom edge for resume items
+        if (!isWatched && progress > 0f) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .align(Alignment.TopCenter)
-                    .background(Color.White.copy(alpha = 0.3f))
+                    .height(5.dp)
+                    .align(Alignment.BottomCenter)
+                    .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                    .background(Color.Black.copy(alpha = 0.7f))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(fraction = (item.playedPercentage / 100f).coerceIn(0f, 1f))
+                        .fillMaxWidth(fraction = (progress / 100f).coerceIn(0f, 1f))
                         .background(JellyfinBlue)
                 )
             }
@@ -139,6 +205,7 @@ fun MediaCard(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(8.dp)
+                .padding(bottom = if (!isWatched && progress > 0f) 4.dp else 0.dp)
         ) {
             Text(
                 text = item.name,
@@ -181,6 +248,24 @@ fun MediaCard(
                                 color = TextPrimary,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 11.sp
+                            )
+                        )
+                    }
+                }
+
+                if (!isWatched && progress > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(JellyfinBlue.copy(alpha = 0.25f))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "${progress.toInt()}%",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = JellyfinBlue,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
                             )
                         )
                     }

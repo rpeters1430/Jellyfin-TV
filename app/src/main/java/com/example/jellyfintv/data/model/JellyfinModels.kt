@@ -94,6 +94,25 @@ data class MediaItem(
     val playedPercentage: Float
         get() = userData?.playedPercentage ?: 0f
 
+    val isPlayed: Boolean
+        get() = userData?.played == true || (userData?.playedPercentage ?: 0f) >= 100f
+
+    val isFavorite: Boolean
+        get() = userData?.isFavorite == true
+
+    val unplayedCount: Int?
+        get() = userData?.unplayedItemCount
+
+    val playbackProgress: Float
+        get() {
+            if (isPlayed) return 100f
+            val pct = userData?.playedPercentage ?: 0f
+            if (pct > 0f) return pct
+            val pos = userData?.playbackPositionTicks ?: 0L
+            val total = runTimeTicks ?: 0L
+            return if (pos > 0L && total > 0L) (pos.toFloat() / total.toFloat() * 100f).coerceIn(0f, 100f) else 0f
+        }
+
     val tagline: String?
         get() = taglines?.firstOrNull { it.isNotBlank() }
 
@@ -176,7 +195,8 @@ data class UserData(
     @SerializedName("PlayCount") val playCount: Int = 0,
     @SerializedName("IsFavorite") val isFavorite: Boolean = false,
     @SerializedName("Played") val played: Boolean = false,
-    @SerializedName("PlayedPercentage") val playedPercentage: Float = 0f
+    @SerializedName("PlayedPercentage") val playedPercentage: Float = 0f,
+    @SerializedName("UnplayedItemCount") val unplayedItemCount: Int? = null
 )
 
 data class MediaSource(
@@ -283,7 +303,8 @@ object SampleMediaData {
                     )
                 )
             ),
-            runTimeTicks = 7_800_000_000L
+            runTimeTicks = 7_800_000_000L,
+            userData = UserData(played = true, playedPercentage = 100f, isFavorite = true)
         ),
         MediaItem(
             id = "mock-3",
@@ -331,7 +352,8 @@ object SampleMediaData {
                 PersonInfo(name = "Tom Hardy", type = "Actor", role = "Max Rockatansky"),
                 PersonInfo(name = "Charlize Theron", type = "Actor", role = "Imperator Furiosa")
             ),
-            runTimeTicks = 7_200_000_000L
+            runTimeTicks = 7_200_000_000L,
+            userData = UserData(played = true, playedPercentage = 100f)
         )
     )
 
@@ -366,7 +388,8 @@ object SampleMediaData {
                         MediaStream(type = "Audio", codec = "EAC3", channels = 8, isDefault = true, language = "eng", displayTitle = "English Dolby Atmos")
                     )
                 )
-            )
+            ),
+            userData = UserData(unplayedItemCount = 3, isFavorite = true)
         ),
         MediaItem(
             id = "mock-series-2",
@@ -396,7 +419,8 @@ object SampleMediaData {
                         MediaStream(type = "Audio", codec = "AC3", channels = 6, isDefault = true, language = "eng", displayTitle = "English 5.1 Surround")
                     )
                 )
-            )
+            ),
+            userData = UserData(played = true, unplayedItemCount = 0)
         )
     )
 

@@ -14,11 +14,11 @@ kotlin = "2.4.21"
 tvFoundation = "1.0.0"
 tvMaterial = "1.1.0"
 retrofit = "3.0.0"
-okhttp = "5.5.0"
+okhttp = "5.5.1"
 coil = "2.7.0"
 media3 = "1.11.1"
 mockk = "1.14.11"
-mockwebserver = "5.5.0"
+mockwebserver = "5.5.1"
 turbine = "1.2.1"
 
 [libraries]
